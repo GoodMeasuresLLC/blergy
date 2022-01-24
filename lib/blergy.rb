@@ -3,10 +3,17 @@
 require_relative "blergy/version"
 require 'thor'
 module Blergy
+  # just a hack to reload all files when they've changed. Instead of doing it properly via spring or whatnot.
+  def self.reload!
+    load 'blergy.rb'
+    load 'aws/base.rb'
+    load 'aws/instance.rb'
+  end
+
   class Error < StandardError; end
   class Main < Thor
     option :filter, type: :array
-    option :region, default: 'us-east-1'
+    option :region, required: false, default: 'us-east-1'
     desc "dump", "dump connect-instance-id target-directory [--filter <regex1> <regex2> ...] --region us-east-1"
     long_desc <<-DOC
       --filter lets you filter out AWS connect flows that you don't want, like test flows.
@@ -19,7 +26,7 @@ module Blergy
       options[:filter].each do |name|
         say "Hello there #{name}"
       end if options[:filter]
-      AWS::Instance.new(connect_instance).dump(target_directory, options)
+      AWS::Instance.new(connect_instance, "#{target_directory}/terraform", options[:region] || 'us-east-1').dump(options)
     end
 
     no_commands do
@@ -31,8 +38,30 @@ module Blergy
 
           AWS_ACCESS_KEY_ID=DqAwDNtd12343134 AWS_ACCESS_KEY_ID=AKIAJWS12343134 blerg dump 12343134 my-terraform-project
           DOC
+          exit(-1)
         end
-        puts "ENV['AWS_ACCESS_KEY_ID'] missing" unless ENV['AWS_ACCESS_KEY_ID']
+      end
+      DIRS = %W(
+                  terraform
+                  terraform/environments
+                  terraform/environments/staging
+                  terraform/environments/common
+                  terraform/environments/production
+                  terraform/modules
+                  terraform/modules/api-gateway
+                  terraform/modules/api-gateway/resource
+                  terraform/modules/roles
+                  terraform/modules/roles/search
+                  terraform/modules/roles/lambda
+                  terraform/modules/storage
+                  terraform/modules/lambda
+                  terraform/modules/connect
+                  terraform/modules/connect/flows
+                  )
+      def mkdirs(target_directory)
+        DIRS.each {|dir|
+          FileUtils.mkpath("#{target_directory}/dir")
+        }
       end
     end
   end
