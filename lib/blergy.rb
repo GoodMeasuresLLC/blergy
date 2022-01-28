@@ -8,6 +8,10 @@ module Blergy
     load 'blergy.rb'
     load 'aws/base.rb'
     load 'aws/instance.rb'
+    load 'aws/contact_flow.rb'
+    load 'aws/hours_of_operation.rb'
+    load 'aws/queue_quick_connect.rb'
+    load 'aws/queue.rb'
   end
 
   class Error < StandardError; end
@@ -27,6 +31,10 @@ module Blergy
         say "Hello there #{name}"
       end if options[:filter]
       AWS::Instance.new(connect_instance, "#{target_directory}/terraform", options[:region] || 'us-east-1').dump(options)
+    end
+    desc "debug", "stuff"
+    def debug(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/terraform')
+      AWS::Instance.new(connect_instance, "#{target_directory}/terraform", options[:region] || 'us-east-1')
     end
 
     no_commands do

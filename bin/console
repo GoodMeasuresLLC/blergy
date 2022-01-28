@@ -12,4 +12,5 @@ require "blergy"
 # Pry.start
 
 require "irb"
+require 'pry'
 IRB.start(__FILE__)

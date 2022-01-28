@@ -5,6 +5,7 @@ module Blergy
       attr_accessor :target_directory
       attr_accessor :attributes
       attr_accessor :variables
+      attr_accessor :instance
 
       def self.credentials
         @credentials ||= Aws::Credentials.new(ENV['AWS_ACCESS_KEY_ID'],ENV['AWS_SECRET_ACCESS_KEY'])
@@ -18,6 +19,19 @@ module Blergy
         @client
       end
 
+      def name
+        attributes["name"] || attributes[:name]
+      end
+      def label
+        fred = name.gsub(/\W+/,'_').gsub(/_$/,'')
+        fred = "_#{fred}" if(fred =~ /^\d/) # terraform variables can't start with a digit
+        fred
+      end
+
+      def terraform_id
+        "#{terraform_resource_name}.#{label}.id"
+      end
+
       def store_stage_variable(variable, value,type='string')
         self.variables||={}
         self.variables['production']||={}
@@ -25,8 +39,8 @@ module Blergy
       end
 
       def write_variables(stage)
-        FileUtils.mkpath(modules_dir)
-        File.open("#{modules_dir}/variables.tf",'w') do |f|
+        FileUtils.mkpath(environment_dir(stage))
+        File.open("#{environment_dir(stage)}/variables.tf",'w') do |f|
           variables['production'].each_pair do |k,v|
             f.write <<-TEMPLATE
 variable "#{k}" {
