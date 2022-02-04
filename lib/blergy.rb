@@ -12,6 +12,11 @@ module Blergy
     load 'aws/hours_of_operation.rb'
     load 'aws/queue_quick_connect.rb'
     load 'aws/queue.rb'
+    load 'aws/lambda_function_association.rb'
+    load 'aws/lambda_function.rb'
+    load 'aws/user.rb'
+    load 'aws/security_profile.rb'
+    load 'aws/routing_profile.rb'
   end
 
   class Error < StandardError; end
@@ -25,12 +30,12 @@ module Blergy
       blerg dump 12343134 my-terraform-project --filter TEST ^Hacking
       --region defaults to us-east-1
     DOC
-    def dump(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/terraform')
+    def dump(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/connect')
       check_aws_config
       options[:filter].each do |name|
         say "Hello there #{name}"
       end if options[:filter]
-      AWS::Instance.new(connect_instance, "#{target_directory}/terraform", options[:region] || 'us-east-1').dump(options)
+      AWS::Instance.new(connect_instance, target_directory, options[:region] || 'us-east-1').dump(options)
     end
     desc "debug", "stuff"
     def debug(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/terraform')
@@ -48,28 +53,6 @@ module Blergy
           DOC
           exit(-1)
         end
-      end
-      DIRS = %W(
-                  terraform
-                  terraform/environments
-                  terraform/environments/staging
-                  terraform/environments/common
-                  terraform/environments/production
-                  terraform/modules
-                  terraform/modules/api-gateway
-                  terraform/modules/api-gateway/resource
-                  terraform/modules/roles
-                  terraform/modules/roles/search
-                  terraform/modules/roles/lambda
-                  terraform/modules/storage
-                  terraform/modules/lambda
-                  terraform/modules/connect
-                  terraform/modules/connect/flows
-                  )
-      def mkdirs(target_directory)
-        DIRS.each {|dir|
-          FileUtils.mkpath("#{target_directory}/dir")
-        }
       end
     end
   end

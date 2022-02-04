@@ -4,6 +4,9 @@ class Hash
       Hash === v ? v.each_with_parent(k, &blk) : blk.call([parent, self, k, v])
     end
   end
+  def deep_clone
+    Marshal.load(Marshal.dump(self))
+  end
 end
 
 module Blergy
@@ -20,12 +23,17 @@ module Blergy
       end
 
       def variablize_content
-        content.each_with_parent do |parent, hash, k, v|
+        fred=content.deep_clone
+        fred.each_with_parent do |parent, hash, k, v|
           if parent == 'ContactFlow'
-            contact_flow = instance.contact_flow_for(hash["id"])
-            hash["id"] = "${#{contact_flow.terraform_id}}"
+            contact_flow = instance.contact_flow_by_id_for(hash["id"])
+            if contact_flow
+              hash["id"] = "${#{contact_flow&.terraform_id}}"
+              hash["text"] = "${#{contact_flow&.attributes["text"]}}"
+            end
           end
         end
+        fred
       end
 
       def modules_dir
@@ -44,12 +52,6 @@ module Blergy
         FileUtils.mkpath(modules_dir)
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
-
- id="fc7e607a-a89f-45b9-8346-0d9a497d03b1",
- name="0x Inbound to Agent",
- type="CONTACT_FLOW",
- description=nil,
-
 resource "#{terraform_resource_name}" "#{label}" {
   instance_id  = "${aws_connect_instance.connect.id}"
   name         = "#{name}"
@@ -68,7 +70,8 @@ resource "#{terraform_resource_name}" "#{label}" {
 
       def self.read(instance)
         instance.flows={}
-        instance.client.list_contact_flows(instance_id: instance.connect_instance_id).contact_flow_summary_list.each do |hash|
+        instance.with_rate_limit do |client|
+          client.list_contact_flows(instance_id: instance.connect_instance_id).contact_flow_summary_list.each do |hash|
 # id="0179bac6-241f-461d-b1b0-1d525f8bd6fa",
 # arn="arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3/contact-flow/0179bac6-241f-461d-b1b0-1d525f8bd6fa",
 # name="00 MainPatient Flow - In (Open)",
@@ -77,7 +80,10 @@ resource "#{terraform_resource_name}" "#{label}" {
            #  `aws connect delete-contact-flow --instance-id #{instance.connect_instance_id} --contact-flow-id #{hash.id}`
 
            # end
-          instance.flows[hash.arn]=ContactFlow.new(instance, hash)
+            instance.with_rate_limit do
+              instance.flows[hash.arn]=ContactFlow.new(instance, hash)
+            end
+          end
         end
       end
     end

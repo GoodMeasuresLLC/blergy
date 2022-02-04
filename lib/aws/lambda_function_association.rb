@@ -1,18 +1,19 @@
 module Blergy
   module AWS
-    class HoursOfOperation < Base
+    class LambdaFunctionAssociation < Base
 
-      def initialize(instance, hash)
+      def initialize(instance, arn)
         self.instance=instance
-        self.attributes=hash.to_h.merge(instance.client.describe_hours_of_operation(instance_id: instance.connect_instance_id, hours_of_operation_id: hash['id']).hours_of_operation)
+        self.attributes= {arn: arn}
+        attributes[:name]=attributes[:arn].match(%r(arn:aws:(?:.+):(?:.+):(.+)))[1]
       end
 
       def modules_dir
-        "#{instance.target_directory}/modules/connect/hours"
+        "#{instance.target_directory}/modules/connect/lambda_function_associations"
       end
 
       def terraform_resource_name
-        "aws_connect_hours_of_operation"
+        "aws_connect_lambda_function_association"
       end
 
       def write_config_templates(f)
@@ -35,19 +36,17 @@ module Blergy
         end
       end
 
+      def lambda_terraform_id
+        "aws_lambda_function.#{label}.id"
+      end
+
       def write_templates
         FileUtils.mkpath(modules_dir)
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
-
-resource "#{terraform_resource_name}" "#{label}" {
+resource "#{terraform_resource_name}"{
   instance_id  = "${aws_connect_instance.connect.id}"
-  name         = "#{name}"
-  description  = "#{attributes["description"]}"
-  time_zone     = "#{attributes["time_zone"]}"
-          TEMPLATE
-          write_config_templates(f)
-          f.write <<-TEMPLATE
+  function_arn         = "${#{lambda_terraform_id}}"
   tags = local.tags
 }
           TEMPLATE
@@ -55,12 +54,10 @@ resource "#{terraform_resource_name}" "#{label}" {
       end
 
       def self.read(instance)
-        instance.hours_of_operations={}
+        instance.lambda_function_associations={}
         instance.with_rate_limit do |client|
-          client.list_hours_of_operations(instance_id: instance.connect_instance_id).hours_of_operation_summary_list.each do |hash|
-            instance.with_rate_limit do |client|
-              instance.hours_of_operations[hash.arn]=self.new(instance, hash)
-            end
+          client.list_lambda_functions(instance_id: instance.connect_instance_id).lambda_functions.each do |arn|
+            instance.lambda_function_associations[arn]=self.new(instance, arn)
           end
         end
       end
