@@ -16,26 +16,6 @@ module Blergy
         "aws_connect_lambda_function_association"
       end
 
-      def write_config_templates(f)
-        attributes[:config].each do |config|
-          f.write <<-TEMPLATE
-  config {
-    day = "#{config[:day]}"
-
-    end_time {
-      hours   = #{config[:end_time][:hours]}
-      minutes = #{config[:end_time][:minutes]}
-    }
-
-    start_time {
-      hours   = #{config[:start_time][:hours]}
-      minutes = #{config[:start_time][:minutes]}
-    }
-  }
-          TEMPLATE
-        end
-      end
-
       def lambda_terraform_id
         "aws_lambda_function.#{label}.id"
       end

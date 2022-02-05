@@ -8,7 +8,7 @@ module Blergy
       end
 
       def modules_dir
-        "#{instance.target_directory}/production/connect/queues"
+        "#{instance.target_directory}/environments/production/queues"
       end
 
       def terraform_resource_name

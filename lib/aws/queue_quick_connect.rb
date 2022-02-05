@@ -11,48 +11,26 @@ module Blergy
         "aws_connect_quick_connect"
       end
       def modules_dir
-        "#{instance.target_directory}/production/connect/quick_connects"
+        "#{instance.target_directory}/environments/production/queue_quick_connects"
       end
-      <<-DOC
-      resp.quick_connect.quick_connect_arn #=> String
-      resp.quick_connect.quick_connect_id #=> String
-      resp.quick_connect.name #=> String
-      resp.quick_connect.description #=> String
-      resp.quick_connect.quick_connect_config.quick_connect_type #=> String, one of "USER", "QUEUE", "PHONE_NUMBER"
-      resp.quick_connect.quick_connect_config.user_config.user_id #=> String
-      resp.quick_connect.quick_connect_config.user_config.contact_flow_id #=> String
-      resp.quick_connect.quick_connect_config.queue_config.queue_id #=> String
-      resp.quick_connect.quick_connect_config.queue_config.contact_flow_id #=> String
-      resp.quick_connect.quick_connect_config.phone_config.phone_number #=> String
-
-
-      quick_connect_config {
-        quick_connect_type = "PHONE_NUMBER"
-
-        phone_config {
-          phone_number = "+12345678912"
-        }
-      }
-
-      DOC
       def write_templates
         FileUtils.mkpath(modules_dir)
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           stuff=attributes[:quick_connect_config][:quick_connect_type]
           binding.pry if stuff.nil?
           f.write <<-TEMPLATE
-          resource "#{terraform_resource_name}" "#{label}" {
-            instance_id  = "${aws_connect_instance.connect.id}"
-            name         = "#{name}"
-            quick_connect_config {
-              quick_connect_type = "#{stuff}"
+resource "#{terraform_resource_name}" "#{label}" {
+	instance_id  = "${aws_connect_instance.connect.id}"
+	name         = "#{name}"
+	quick_connect_config {
+	  quick_connect_type = "#{stuff}"
 
               TEMPLATE
               send "write_#{stuff.downcase}_config", f
               f.write <<-TEMPLATE
-            }
-            tags = local.tags
-          }
+	}
+	tags = local.tags
+}
           TEMPLATE
         end
       end

@@ -8,13 +8,13 @@ module Blergy
       end
 
       def modules_dir
-        "#{instance.target_directory}/production/connect/routing_profile"
+        "#{instance.target_directory}/environments/production/routing_profile"
       end
 
       def write_templates
         FileUtils.mkpath(modules_dir)
         File.open("#{modules_dir}/#{label}.json",'w') do |f|
-          f.write attributes.to_json
+          f.write JSON.pretty_generate(attributes)
         end
       end
 
