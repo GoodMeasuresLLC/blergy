@@ -1,6 +1,7 @@
 module Blergy
   module AWS
     class Instance < Base
+
       attr_accessor :connect_instance_id
       attr_accessor :flows
       attr_accessor :hours_of_operations
@@ -12,12 +13,45 @@ module Blergy
       attr_accessor :security_profiles
       attr_accessor :routing_profiles
 
+      def hours_of_operations
+        # can't write a valid template unless you actually define some valid hours of operation, which is in the
+        # config.
+        @hours_of_operations.reject {|key, obj|(obj.attributes[:config]||[]).empty?}
+      end
 
+      def add_hours_of_operation(key, obj)
+        @hours_of_operations[key]=obj
+      end
+
+      def queues
+        @queues.reject {|key, obj|obj.attributes[:status] == 'DISABLED'}
+      end
+
+      def add_queue(key, obj)
+        @queues[key]=obj
+      end
 
       def initialize(connect_instance_id, target_directory, region)
         self.connect_instance_id = connect_instance_id
         self.target_directory=target_directory
         self.region = region
+        self.attributes={name: 'connect'}
+      end
+
+      def label
+        "connect"
+      end
+
+      def terraform_reference
+        "var.connect_instance_id"
+      end
+
+      def terraform_key
+        "id"
+      end
+
+      def terraform_resource_name
+        "aws_connect_instance"
       end
 
       def modules_dir
@@ -111,19 +145,12 @@ module Blergy
         self.attributes = client.describe_instance({instance_id: connect_instance_id}).instance
         # puts "attributes=#{attributes.instance_alias}"
         store_stage_variable("instance_alias",attributes.instance_alias)
-        Queue.read(self)
-        QueueQuickConnect.read(self)
-        HoursOfOperation.read(self)
         ContactFlow.read(self)
         LambdaFunctionAssociation.read(self)
         LambdaFunction.read(self)
-# YOU WERE HERE -
-# * make things environment based.
-# * finish caller id configurations
-
-        # caller ids
-        # make queues, QueueQuickConnect be environment based
-        # users as well, except for production
+        Queue.read(self)
+        QueueQuickConnect.read(self)
+        HoursOfOperation.read(self)
         User.read(self)
         RoutingProfile.read(self)
         SecurityProfile.read(self)
@@ -173,7 +200,7 @@ module Blergy
 # 1. get the list of arns
 # 2. create the actual lambda resource in a different place aws_lambda_function
 #
-        write_environments
+        # write_environments
         write_templates
       end
 
@@ -200,19 +227,17 @@ provider "aws" {
   region = var.region
 }
 
-module "staging" {
-  source = "../../.."
+module "connect" {
+  source = "../.."
 
   # items from ../common outputs
   # NOTE - to acquire these values run `terraform output` from the ../common dir
   account_id = var.account_id
-  name_prefix = var.name_prefix
   region = var.region
   vpc_id = var.vpc_id
   vpc_endpoint_id = var.vpc_endpoint_id
-  subnet_ids = var.subnet_ids
   lambda_role_arn = var.lambda_role_arn
-
+  instance_alias = var.instance_alias
   # items specific to this environment
   environment = var.environment
 }
@@ -224,6 +249,13 @@ module "staging" {
 
       def write_templates
         FileUtils.mkpath(modules_dir)
+        File.open("#{modules_dir}/outputs.tf",'w') do |f|
+          f.write <<-TEMPLATE
+output "connect_instance_id" {
+  value = aws_connect_instance.connect.id
+}
+          TEMPLATE
+        end
         File.open("#{modules_dir}/main.tf",'w') do |f|
           f.write <<-TEMPLATE
 terraform {
@@ -236,19 +268,12 @@ terraform {
   required_version = ">= 0.14.9"
 }
 
-locals {
-  tags = {
-    environment = var.environment,
-    project = "connect"
-  }
-}
-
 provider "aws" {
   profile = "default"
   region  = "#{region}"
 }
 
-resource "aws_connect_instance" "connect" {
+resource "aws_connect_instance" "#{label}" {
   identity_management_type = "#{attributes.identity_management_type}"
   inbound_calls_enabled    = #{attributes.inbound_calls_enabled}
   instance_alias           = var.instance_alias
@@ -256,23 +281,27 @@ resource "aws_connect_instance" "connect" {
   auto_resolve_best_voices_enabled = false
   contact_flow_logs_enabled = true
   early_media_enabled = false
-  tags = local.tags
 }
           TEMPLATE
         end
-        # lambda_function_associations.values.map(&:write_templates)
-        lambda_functions.values.map(&:write_templates)
-        flows.values.map(&:write_templates)
-        hours_of_operations.values.map(&:write_templates)
-        queue_quick_connects.values.map(&:write_templates)
-        queues.values.map(&:write_templates)
-        users.values.map(&:write_templates)
-        routing_profiles.values.map(&:write_templates)
-        security_profiles.values.map(&:write_templates)
-        # dump a json of all prompts, since that's all I can do:
-        File.write("#{modules_dir}/prompts.json",
-          JSON.pretty_generate(
-            client.list_prompts(instance_id: connect_instance_id).prompt_summary_list.map(&:to_h)))
+
+        # %W(hours_of_operations_map flows_map security_profiles_map)
+        binding.pry
+        ContactFlow.write_templates(self, "#{target_directory}/modules/connect/flows",:flows, [:queues_map, :lambda_map])
+        if(false)
+        LambdaFunction.write_templates(self, "#{target_directory}/modules/lambdas", :lambda_functions)
+        HoursOfOperation.write_templates(self, "#{target_directory}/modules/connect/hours", :hours_of_operations,[])
+        Queue.write_templates(self, "#{target_directory}/environments/production/queues",:queues,[:flows_map, :lambda_map])
+        SecurityProfile.write_templates(self, "#{target_directory}/modules/connect/security_profile",:security_profiles,[])
+        LambdaFunctionAssociation.write_templates(self, "#{target_directory}/modules/connect/lambda_function_associations", :lambda_function_associations,[:lambda_map])
+          queue_quick_connects.values.map(&:write_templates)
+          users.values.map(&:write_templates)
+          routing_profiles.values.map(&:write_templates)
+          # dump a json of all prompts, since that's all I can do:
+          File.write("#{modules_dir}/prompts.json",
+            JSON.pretty_generate(
+              client.list_prompts(instance_id: connect_instance_id).prompt_summary_list.map(&:to_h)))
+        end
       end
     end
   end

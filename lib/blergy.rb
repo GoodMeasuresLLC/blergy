@@ -27,14 +27,11 @@ module Blergy
     long_desc <<-DOC
       --filter lets you filter out AWS connect flows that you don't want, like test flows.
       Example:
-      blerg dump 12343134 my-terraform-project --filter TEST ^Hacking
+      blergy dump 12343134 my-terraform-project --filter TEST ^Hacking
       --region defaults to us-east-1
     DOC
     def dump(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/connect')
       check_aws_config
-      options[:filter].each do |name|
-        say "Hello there #{name}"
-      end if options[:filter]
       AWS::Instance.new(connect_instance, target_directory, options[:region] || 'us-east-1').dump(options)
     end
     desc "debug", "stuff"

@@ -11,6 +11,14 @@ module Blergy
         "#{instance.target_directory}/environments/production/queues"
       end
 
+      def accessor_name
+        :queues
+      end
+
+      def terraform_key
+        "queue_id"
+      end
+
       def terraform_resource_name
         "aws_connect_queue"
       end
@@ -29,36 +37,33 @@ module Blergy
  :tags=>{}}
       DOC
       def write_templates
-        FileUtils.mkpath(modules_dir)
         hours_of_operation = instance.hours_of_operation_by_id_for(attributes[:hours_of_operation_id])
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
-          resource "#{terraform_resource_name}" "#{label}" {
-            description  = "#{attributes[:description]}"
-            hours_of_operation_id = "${#{hours_of_operation.terraform_id}}"
-            instance_id  = "${${instance.terraform_id}"
+resource "#{terraform_resource_name}" "#{label}" {
+  description  = "#{attributes[:description]}"
+  hours_of_operation_id = #{hours_of_operation.terraform_reference}
+  instance_id  = #{instance.terraform_reference}
           TEMPLATE
-          f.write "max_contacts = #{attributes[:max_contacts]}" if attributes[:max_contacts]
+          f.write "  max_contacts = #{attributes[:max_contacts]}\n" if attributes[:max_contacts]
           f.write <<-TEMPLATE
-            name         = "#{name}"
+  name         = "#{name}"
           TEMPLATE
           if(attributes[:outbound_caller_config])
             arr = [
-              "outbound_caller_config {"
+              "  outbound_caller_config {"
             ]
-            arr.push("outbound_caller_id_name=#{attributes[:outbound_caller_config][:outbound_caller_id_name]}") if attributes[:outbound_caller_config][:outbound_caller_id_name]
-            arr.push("outbound_caller_id_number_id=#{attributes[:outbound_caller_config][:outbound_caller_id_number_id]}") if attributes[:outbound_caller_config][:outbound_caller_id_number_id]
+            arr.push("    outbound_caller_id_name=\"#{attributes[:outbound_caller_config][:outbound_caller_id_name]}\"") if attributes[:outbound_caller_config][:outbound_caller_id_name]
+            arr.push("    outbound_caller_id_number_id=\"#{attributes[:outbound_caller_config][:outbound_caller_id_number_id]}\"") if attributes[:outbound_caller_config][:outbound_caller_id_number_id]
             contact_flow = instance.contact_flow_by_id_for(attributes[:outbound_caller_config][:outbound_flow_id])
             if contact_flow
-              arr.push("outbound_flow_id=${#{contact_flow.terraform_id}}")
+              arr.push("    outbound_flow_id=#{contact_flow.terraform_reference}")
             end
-            arr.push("}")
+            arr.push("  }")
             f.write arr.join("\n")
           end
-          # quick_connect_ids ??? one or more? or, never happens?
           f.write <<-TEMPLATE
-            }
-            tags = local.tags
+            tags = var.tags
           }
           TEMPLATE
         end
@@ -69,7 +74,7 @@ module Blergy
         puts "write_user_config: #{name}: missing contact_flow #{attributes[:quick_connect_config][:user_config][:contact_flow_id]} #{attributes[:quick_connect_config][:user_config]}" unless contact_flow
         f.write <<-TEMPLATE
         user_config {
-          contact_flow_id = "#{contact_flow&.terraform_id}"
+          contact_flow_id = "#{contact_flow&.terraform_reference}"
           user_id = "#{attributes[:quick_connect_config][:user_config][:user_id]}"
         }
         TEMPLATE
@@ -91,8 +96,8 @@ module Blergy
 
         f.write <<-TEMPLATE
         queue_config {
-          contact_flow_id = "#{contact_flow&.terraform_id}"
-          queue_id = "#{queue&.terraform_id}"
+          contact_flow_id = "#{contact_flow&.terraform_reference}"
+          queue_id = "#{queue&.terraform_reference}"
         }
         TEMPLATE
       end
@@ -103,7 +108,7 @@ module Blergy
           client.list_queues(instance_id: instance.connect_instance_id).queue_summary_list.each do |hash|
             next unless hash.name
             instance.with_rate_limit do
-              instance.queues[hash.arn]=self.new(instance, hash)
+              instance.add_queue(hash.arn,self.new(instance, hash))
             end
           end
         end

@@ -12,6 +12,10 @@ module Blergy
         "#{instance.target_directory}/modules/connect/lambda_function_associations"
       end
 
+      def accessor_name
+        :lambda_function_associations
+      end
+
       def terraform_resource_name
         "aws_connect_lambda_function_association"
       end
@@ -20,14 +24,27 @@ module Blergy
         "aws_lambda_function.#{label}.id"
       end
 
+      def self.write_templates(instance, modules_dir, resource_name, references)
+        FileUtils.mkpath(modules_dir)
+        File.open("#{modules_dir}/variables.tf",'w') do |f|
+          f.write <<-TEMPLATE
+variable "connect_instance_id" {}
+variable "lambda_functions_map" {type = map(any)}
+variable "tags" {}
+          TEMPLATE
+        end
+        instance.send(resource_name).values.map(&:write_templates)
+      end
+
       def write_templates
         FileUtils.mkpath(modules_dir)
+        lambda_function = instance.lambda_function_for(attributes[:arn])
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
 resource "#{terraform_resource_name}"{
-  instance_id  = "${aws_connect_instance.connect.id}"
-  function_arn         = "${#{lambda_terraform_id}}"
-  tags = local.tags
+  instance_id  = var.connect_instance_id
+  function_arn         = #{lambda_function.terraform_reference}
+  tags = var.tags
 }
           TEMPLATE
         end

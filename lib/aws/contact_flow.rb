@@ -25,12 +25,25 @@ module Blergy
       def variablize_content
         fred=content.deep_clone
         fred.each_with_parent do |parent, hash, k, v|
-          if parent == 'ContactFlow'
+          puts "#{parent}/#{k}"
+          if parent.downcase == /contactflow|contactflowid/ && value.to_s =~ /arn:/
             contact_flow = instance.contact_flow_by_id_for(hash["id"])
             if contact_flow
-              hash["id"] = "${#{contact_flow&.terraform_id}}"
-              hash["text"] = "${#{contact_flow&.attributes["text"]}}"
+              hash["id"] = "${#{contact_flow&.terraform_reference}}"
+              hash["text"] = "#{contact_flow&.attributes[:text]}"
             end
+          elsif parent.downcase == /queue|customerqueue|queueid/ && value.to_s =~ /arn:/
+            queue = instance.queue_for(hash["id"])
+            if queue
+              hash["id"] = "${#{queue&.terraform_reference}}"
+              hash["text"] = "#{queue&.attributes[:text]}"
+            end
+          elsif k == "ContactFlowId" && value.to_s =~ /arn:/
+            hash[k]="${#{instance.contact_flow_by_id_for(hash[k]).terraform_reference}}"
+          elsif k == "LambdaFunctionARN" && value.to_s =~ /arn:/
+            lambda = instance.lambda_function_for(hash[k])
+            binding.pry
+            hash[k]="${#{lambda.terraform_reference}}"
           end
         end
         fred
@@ -40,6 +53,13 @@ module Blergy
         "#{instance.target_directory}/modules/connect/flows"
       end
 
+      def accessor_name
+        :flows
+      end
+
+      def terraform_key
+        "contact_flow_id"
+      end
       def terraform_resource_name
         "aws_connect_contact_flow"
       end
@@ -53,13 +73,13 @@ module Blergy
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
 resource "#{terraform_resource_name}" "#{label}" {
-  instance_id  = "${aws_connect_instance.connect.id}"
+  instance_id  = var.connect_instance_id
   name         = "#{name}"
   type         = "#{attributes[:type]}"
   description  = "#{attributes[:description]}"
   filename     = "#{file_name}"
   content_hash = filebase64sha256("#{file_name}")
-  tags = local.tags
+  tags = var.tags
 }
           TEMPLATE
         end

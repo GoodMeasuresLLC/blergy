@@ -7,6 +7,13 @@ module Blergy
         self.attributes=hash.to_h.merge(instance.client.describe_quick_connect(instance_id: instance.connect_instance_id, quick_connect_id: hash['id']).quick_connect)
       end
 
+      def terraform_key
+        "queue_quick_connect_id"
+      end
+
+      def accessor_name
+        :queue_quick_connects
+      end
       def terraform_resource_name
         "aws_connect_quick_connect"
       end
@@ -20,7 +27,7 @@ module Blergy
           binding.pry if stuff.nil?
           f.write <<-TEMPLATE
 resource "#{terraform_resource_name}" "#{label}" {
-	instance_id  = "${aws_connect_instance.connect.id}"
+	instance_id  = var.connect_instance_id
 	name         = "#{name}"
 	quick_connect_config {
 	  quick_connect_type = "#{stuff}"
@@ -29,7 +36,7 @@ resource "#{terraform_resource_name}" "#{label}" {
               send "write_#{stuff.downcase}_config", f
               f.write <<-TEMPLATE
 	}
-	tags = local.tags
+	tags = var.tags
 }
           TEMPLATE
         end
@@ -53,7 +60,7 @@ resource "#{terraform_resource_name}" "#{label}" {
         puts "queue_quick_connect: write_user_config #{name}: missing contact_flow #{attributes[:quick_connect_config][:user_config][:contact_flow_id]}" unless contact_flow
         f.write <<-TEMPLATE
         user_config {
-          contact_flow_id = "${#{contact_flow&.terraform_id}}"
+          contact_flow_id = "${#{contact_flow&.terraform_reference}}"
             user_id = "#{attributes[:quick_connect_config][:user_config][:user_id]}"
         }
         TEMPLATE
@@ -75,7 +82,7 @@ resource "#{terraform_resource_name}" "#{label}" {
 
         f.write <<-TEMPLATE
         queue_config {
-          contact_flow_id = "#{contact_flow&.terraform_id}"
+          contact_flow_id = "#{contact_flow&.terraform_reference}"
           queue_id = "#{queue&.terraform_id}"
         }
         TEMPLATE

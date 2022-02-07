@@ -25,7 +25,15 @@ module Blergy
       end
 
       def modules_dir
-        "#{instance.target_directory}/environments/production/security_profile"
+        "#{instance.target_directory}/modules/connect/security_profile"
+      end
+
+      def accessor_name
+        :security_profiles
+      end
+
+      def terraform_key
+        "security_profile_id"
       end
 
       def terraform_resource_name
@@ -33,11 +41,10 @@ module Blergy
       end
 
       def write_templates
-        FileUtils.mkpath(modules_dir)
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
 resource "#{terraform_resource_name}" "#{label}" {
-  instance_id  = "${${instance.terraform_id}"
+  instance_id  = "${#{instance.terraform_reference}}"
   name         = "#{attributes[:name]}"
   description  = "#{attributes[:description]}"
           TEMPLATE
@@ -47,7 +54,7 @@ permissions  = [#{attributes[:permissions].map{|a|%Q{"#{a}"}}.join(",")}]
             TEMPLATE
           end
           f.write <<-TEMPLATE
-  tags = local.tags
+  tags = var.tags
 }
           TEMPLATE
         end

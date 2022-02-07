@@ -18,15 +18,23 @@ module Blergy
       end
 
       def source_dir
-        "#{instance.target_directory}/lambda_source"
+        "$HERE/../../lambda_source"
       end
 
       def compilation_dir
-        "#{instance.target_directory}/compiled"
+        "$HERE/../../compiled"
       end
 
       def modules_dir
         "#{instance.target_directory}/modules/lambdas"
+      end
+
+      def terraform_key
+        "arn"
+      end
+
+      def accessor_name
+        :lambda_functions
       end
 
       def terraform_resource_name
@@ -97,12 +105,34 @@ which also returns configuration.code.location
 
 It is possible the function_name can also be a ARN. It can be in the CLI.
 DOC
+      def self.write_templates(instance, modules_dir, resource_name)
+        FileUtils.mkpath(modules_dir)
+        File.open("#{modules_dir}/variables.tf",'w') do |f|
+          f.write <<-TEMPLATE
+variable "tags" {}
+          TEMPLATE
+        end
+        File.open("#{modules_dir}/outputs.tf",'w') do |f|
+          f.write <<-TEMPLATE
+output "#{resource_name}_map" {
+  value = {
+    #{instance.send(resource_name).values.map {|obj| "\"#{obj.label}\" = #{obj.terraform_id}" }.join(",\n")}
+  }
+}
+          TEMPLATE
+        end
+        instance.send(resource_name).values.map(&:write_templates)
+      end
+
       def write_templates
-        FileUtils.mkpath(source_dir)
-        target_dir="#{source_dir}/#{name}"
-        FileUtils.mkpath(target_dir)
-        zipfile="#{source_dir}/#{name}.zip"
-        compiled_zip_path="#{compilation_dir}/#{name}.zip"
+        source_abs_dir="#{instance.target_directory}/lambda_source/#{label}"
+        target_abs_dir="#{instance.target_directory}/compiled"
+        FileUtils.mkpath(source_abs_dir)
+        target_dir="#{source_dir}/#{label}"
+        FileUtils.mkpath(target_abs_dir)
+        zipfile_file=Tempfile.new
+        zipfile = zipfile_file.path
+        compiled_zip_path="#{compilation_dir}/#{label}.zip"
         build_script="#{target_dir}/build.sh"
         uri = URI(location)
         res = Net::HTTP.get_response(uri)
@@ -120,21 +150,22 @@ zip #{target_dir} -d #{compiled_zip_path}
         FileUtils.chmod("+x",build_script)
         FileUtils.mkpath(modules_dir)
         FileUtils.mkpath(compilation_dir)
+        compiled_zip_relative_path = "../../compiled/#{label}.zip"
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
 resource "#{terraform_resource_name}" "#{label}"{
   function_name="#{name}"
   description  = "#{attributes[:description]}"
-  tags         =local.tags
+  tags         = var.tags
   runtime      ="#{attributes[:runtime]}"
   role         ="arn:aws:iam::201706955376:role/lambda_basic_execution"
-  handler      ="${attributes[:handler]}"
+  handler      ="#{attributes[:handler]}"
   timeout      = #{attributes[:timeout]}
   memory_size  = #{attributes[:memory_size]}
   package_type ="Zip"
   layers = [aws_lambda_layer_version.layers.arn]
-  filename     = "#{compiled_zip_path}"
-  source_code_hash = filebase64sha256("#{compiled_zip_path}")
+  filename     = "#{compiled_zip_relative_path}"
+  source_code_hash = filebase64sha256("#{compiled_zip_relative_path}")
 }
 
   depends_on = [aws_cloudwatch_log_group.log_group]
@@ -157,7 +188,8 @@ resource "aws_cloudwatch_log_group" "log_group" {
           f.write <<-EOS
 #!/bin/bash
 # builds all the lambda functions by calling a build.sh script in their repo, the output
-# of which should be putting a zip file in the compiled director
+# of which should be putting a zip file in the compiled directory
+export HERE=`pwd`
 find *  -name 'build.sh' -depth 1 -print -exec {} \;
           EOS
         end
@@ -169,7 +201,7 @@ find *  -name 'build.sh' -depth 1 -print -exec {} \;
         install_build_script(instance)
         instance.lambda_functions={}
         instance.lambda_function_associations.values.each do |tmp|
-          instance.lambda_functions[tmp.name]=self.new(instance, tmp.name)
+          instance.lambda_functions[tmp.attributes[:arn]]=self.new(instance, tmp.name)
         end
       end
     end

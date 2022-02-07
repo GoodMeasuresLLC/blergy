@@ -11,6 +11,14 @@ module Blergy
         "#{instance.target_directory}/modules/connect/hours"
       end
 
+      def accessor_name
+        :hours_of_operations
+      end
+
+      def terraform_key
+        "hours_of_operation_id"
+      end
+
       def terraform_resource_name
         "aws_connect_hours_of_operation"
       end
@@ -36,19 +44,17 @@ module Blergy
       end
 
       def write_templates
-        FileUtils.mkpath(modules_dir)
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
-
 resource "#{terraform_resource_name}" "#{label}" {
-  instance_id  = "${aws_connect_instance.connect.id}"
+  instance_id  = var.connect_instance_id
   name         = "#{name}"
-  description  = "#{attributes["description"]}"
-  time_zone     = "#{attributes["time_zone"]}"
-          TEMPLATE
+TEMPLATE
+          f.write  %Q{  description  = "#{attributes["description"]}"\n} if attributes["description"]
+          f.write  %Q{  time_zone  = "#{attributes["time_zone"]||'America/New_York'}"\n}
           write_config_templates(f)
           f.write <<-TEMPLATE
-  tags = local.tags
+  tags = var.tags
 }
           TEMPLATE
         end
@@ -59,7 +65,7 @@ resource "#{terraform_resource_name}" "#{label}" {
         instance.with_rate_limit do |client|
           client.list_hours_of_operations(instance_id: instance.connect_instance_id).hours_of_operation_summary_list.each do |hash|
             instance.with_rate_limit do |client|
-              instance.hours_of_operations[hash.arn]=self.new(instance, hash)
+              instance.add_hours_of_operation(hash.arn, self.new(instance, hash))
             end
           end
         end
