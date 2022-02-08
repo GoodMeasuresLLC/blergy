@@ -110,6 +110,7 @@ DOC
         File.open("#{modules_dir}/variables.tf",'w') do |f|
           f.write <<-TEMPLATE
 variable "tags" {}
+variable "log_retention_days" {}
           TEMPLATE
         end
         File.open("#{modules_dir}/outputs.tf",'w') do |f|
@@ -124,6 +125,10 @@ output "#{resource_name}_map" {
         instance.send(resource_name).values.map(&:write_templates)
       end
 
+      def ruby?
+        attributes[:runtime] =~ /ruby/
+      end
+
       def write_templates
         source_abs_dir="#{instance.target_directory}/lambda_source/#{label}"
         target_abs_dir="#{instance.target_directory}/compiled"
@@ -133,28 +138,59 @@ output "#{resource_name}_map" {
         zipfile_file=Tempfile.new
         zipfile = zipfile_file.path
         compiled_zip_path="#{compilation_dir}/#{label}.zip"
-        build_script="#{target_dir}/build.sh"
+        build_script="#{source_abs_dir}/build.sh"
         uri = URI(location)
         res = Net::HTTP.get_response(uri)
         File.open(zipfile,'wb') do |outfile|
           outfile.write(res.body)
         end
-        `unzip -o #{zipfile} -d #{target_dir}`
-        FileUtils.rm(zipfile)
-        File.open(build_script,'w') do |f|
+        if(ruby?)
+          File.open("#{source_abs_dir}/.ruby-version","w") do |f|
+            f.write("2.7.1")
+          end
+          File.open("#{source_abs_dir}/Gemfile","w") do |f|
+            f.write <<-TEMPLATE
+source 'https://rubygems.org'
+
+gem 'httparty'
+gem 'json_pure'
+gem 'mime-types-data'
+gem 'json'
+gem 'mime-types'
+gem 'multi_xml'
+            TEMPLATE
+          end
+          File.open(build_script,'w') do |f|
           f.write <<-EOS
 #!/bin/bash
-zip #{target_dir} -d #{compiled_zip_path}
+cd #{label}
+rm -rf vendor
+bundle config set --local path 'vendor/bundle'
+bundle install
+cd ..
+zip -r ../../compiled/#{label} #{label}
           EOS
         end
+      else
+          File.open(build_script,'w') do |f|
+            f.write <<-EOS
+#!/bin/bash
+zip -r ../../compiled/#{label} #{label}
+            EOS
+          end
+        end
+        `unzip -o #{zipfile} -d #{source_abs_dir}`
+        FileUtils.rm(zipfile)
         FileUtils.chmod("+x",build_script)
         FileUtils.mkpath(modules_dir)
         FileUtils.mkpath(compilation_dir)
-        compiled_zip_relative_path = "../../compiled/#{label}.zip"
+        attributes[:runtime]="ruby2.7" if ruby?
+        attributes[:runtime]="nodejs14.x" if attributes[:runtime] =~ /nodejs/
+        compiled_zip_relative_path = "../../../compiled/#{label}.zip"
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
 resource "#{terraform_resource_name}" "#{label}"{
-  function_name="#{name}"
+  function_name="#{name}-${var.tags["environment"]}"
   description  = "#{attributes[:description]}"
   tags         = var.tags
   runtime      ="#{attributes[:runtime]}"
@@ -163,16 +199,13 @@ resource "#{terraform_resource_name}" "#{label}"{
   timeout      = #{attributes[:timeout]}
   memory_size  = #{attributes[:memory_size]}
   package_type ="Zip"
-  layers = [aws_lambda_layer_version.layers.arn]
   filename     = "#{compiled_zip_relative_path}"
   source_code_hash = filebase64sha256("#{compiled_zip_relative_path}")
+  depends_on = [aws_cloudwatch_log_group.log_group-#{label}]
 }
 
-  depends_on = [aws_cloudwatch_log_group.log_group]
-}
-
-resource "aws_cloudwatch_log_group" "log_group" {
-  name = "/aws/lambda/#{name}"
+resource "aws_cloudwatch_log_group" "log_group-#{label}" {
+  name = "/aws/lambda/#{name}-${var.tags["environment"]}"
   retention_in_days = var.log_retention_days
 }
 
@@ -190,7 +223,7 @@ resource "aws_cloudwatch_log_group" "log_group" {
 # builds all the lambda functions by calling a build.sh script in their repo, the output
 # of which should be putting a zip file in the compiled directory
 export HERE=`pwd`
-find *  -name 'build.sh' -depth 1 -print -exec {} \;
+find *  -name 'build.sh' -depth 1 -print -exec {} \\;
           EOS
         end
         FileUtils.chmod("+x",build_script)

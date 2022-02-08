@@ -42,7 +42,6 @@ module Blergy
             hash[k]="${#{instance.contact_flow_by_id_for(hash[k]).terraform_reference}}"
           elsif k == "LambdaFunctionARN" && value.to_s =~ /arn:/
             lambda = instance.lambda_function_for(hash[k])
-            binding.pry
             hash[k]="${#{lambda.terraform_reference}}"
           end
         end
