@@ -168,14 +168,14 @@ rm -rf vendor
 bundle config set --local path 'vendor/bundle'
 bundle install
 cd ..
-zip -r ../../compiled/#{label} #{label}
+zip -r ../compiled/#{label} #{label}
           EOS
         end
       else
           File.open(build_script,'w') do |f|
             f.write <<-EOS
 #!/bin/bash
-zip -r ../../compiled/#{label} #{label}
+zip -r ../compiled/#{label} #{label}
             EOS
           end
         end
@@ -186,7 +186,7 @@ zip -r ../../compiled/#{label} #{label}
         FileUtils.mkpath(compilation_dir)
         attributes[:runtime]="ruby2.7" if ruby?
         attributes[:runtime]="nodejs14.x" if attributes[:runtime] =~ /nodejs/
-        compiled_zip_relative_path = "../../../compiled/#{label}.zip"
+        compiled_zip_relative_path = "../../compiled/#{label}.zip"
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
 resource "#{terraform_resource_name}" "#{label}"{
