@@ -286,10 +286,9 @@ resource "aws_connect_instance" "#{label}" {
         end
 
         # %W(hours_of_operations_map flows_map security_profiles_map)
-        binding.pry
-        ContactFlow.write_templates(self, "#{target_directory}/modules/connect/flows",:flows, [:queues_map, :lambda_map])
-        if(false)
         LambdaFunction.write_templates(self, "#{target_directory}/modules/lambdas", :lambda_functions)
+        if(false)
+        ContactFlow.write_templates(self, "#{target_directory}/modules/connect/flows",:flows, [:queues_map, :lambda_map])
         HoursOfOperation.write_templates(self, "#{target_directory}/modules/connect/hours", :hours_of_operations,[])
         Queue.write_templates(self, "#{target_directory}/environments/production/queues",:queues,[:flows_map, :lambda_map])
         SecurityProfile.write_templates(self, "#{target_directory}/modules/connect/security_profile",:security_profiles,[])
