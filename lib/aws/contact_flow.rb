@@ -25,14 +25,15 @@ module Blergy
       def variablize_content
         fred=content.deep_clone
         fred.each_with_parent do |parent, hash, k, v|
+          next unless parent
           puts "#{parent}/#{k}"
-          if parent.downcase == /contactflow|contactflowid/ && value.to_s =~ /arn:/
+          if parent.downcase =~ /contactflow|contactflowid/ && value.to_s =~ /arn:/
             contact_flow = instance.contact_flow_by_id_for(hash["id"])
             if contact_flow
-              hash["id"] = "${#{contact_flow&.terraform_reference}}"
+              hash["id"] = "#{contact_flow&.terraform_reference}}"
               hash["text"] = "#{contact_flow&.attributes[:text]}"
             end
-          elsif parent.downcase == /queue|customerqueue|queueid/ && value.to_s =~ /arn:/
+          elsif parent.downcase =~ /queue|customerqueue|queueid/ && value.to_s =~ /arn:/
             queue = instance.queue_for(hash["id"])
             if queue
               hash["id"] = "${#{queue&.terraform_reference}}"

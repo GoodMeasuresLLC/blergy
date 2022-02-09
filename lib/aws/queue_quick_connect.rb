@@ -2,9 +2,20 @@ module Blergy
   module AWS
     class QueueQuickConnect < Base
 
-      def initialize(instance, hash)
+      def initialize(instance, hash={})
         self.instance=instance
-        self.attributes=hash.to_h.merge(instance.client.describe_quick_connect(instance_id: instance.connect_instance_id, quick_connect_id: hash['id']).quick_connect)
+        self.attributes=hash.to_h.merge(instance.client.describe_quick_connect(instance_id: instance.connect_instance_id, quick_connect_id: hash['id']).quick_connect) if hash['id']
+      end
+
+      def create(staging_instance)
+      	obj = self.class.new(staging_instance)
+      	obj.attributes = attributes.deep_clone
+      	user_id = attributes.dig(:quick_connect_config, :user_config, :user_id)
+      	if(user_id)
+	      obj.attributes[:quick_connect_config][:user_config][:user_id]=staging_instance.user_for_by_id(user_id).id
+	    end
+      	staging_instance.queue_quick_connects[obj.arn]=obj
+      	obj.write_templates
       end
 
       def terraform_key
@@ -18,7 +29,7 @@ module Blergy
         "aws_connect_quick_connect"
       end
       def modules_dir
-        "#{instance.target_directory}/environments/production/queue_quick_connects"
+        "#{instance.target_directory}/environments/#{environment}/queue_quick_connects"
       end
       def write_templates
         FileUtils.mkpath(modules_dir)

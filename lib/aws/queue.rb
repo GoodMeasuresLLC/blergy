@@ -2,13 +2,13 @@ module Blergy
   module AWS
     class Queue < Base
 
-      def initialize(instance, hash)
+      def initialize(instance, hash={})
         self.instance=instance
-        self.attributes=hash.to_h.merge(instance.client.describe_queue(instance_id: instance.connect_instance_id, queue_id: hash['id']).queue)
+        self.attributes=hash.to_h.merge(instance.client.describe_queue(instance_id: instance.connect_instance_id, queue_id: hash['id']).queue) if hash['id']
       end
 
       def modules_dir
-        "#{instance.target_directory}/environments/production/queues"
+        "#{instance.target_directory}/environments/#{environment}/queues"
       end
 
       def accessor_name
@@ -36,6 +36,30 @@ module Blergy
  :status=>"ENABLED",
  :tags=>{}}
       DOC
+      def create(staging_instance)
+        queue = self.class.new(staging_instance)
+        queue.attributes = attributes.deep_clone
+        tmp = instance.hours_of_operation_by_id_for(attributes[:hours_of_operation_id])
+        queue.attributes[:hours_of_operation_id]=staging_instance.hours_of_operation_by_name_for(tmp.name).id
+        if(queue.attributes[:outbound_caller_config])
+          queue.attributes[:outbound_caller_config][:outbound_caller_id_name]=nil
+          queue.attributes[:outbound_caller_config][:outbound_caller_id_number_id]=nil
+        end
+        if(attributes.dig(:outbound_caller_config,:outbound_flow_id))
+          tmp = instance.contact_flow_by_id_for(attributes[:outbound_caller_config][:outbound_flow_id])
+          outbound_flow = staging_instance.contact_flow_by_name_for(tmp.name)
+          # horrible hack based on the fact that the terraform reference for the flow
+          # is the same in production and staging environments, and I happen to know that the only
+          # thing that queue does with the flow is call terraform_reference. ;)
+          if(outbound_flow)
+            queue.attributes[:outbound_caller_config][:outbound_flow_id]=outbound_flow.id
+          else
+            queue.attributes[:outbound_caller_config][:outbound_flow_id]=tmp
+          end
+        end
+        staging_instance.add_queue(queue.arn, queue)
+      end
+
       def write_templates
         hours_of_operation = instance.hours_of_operation_by_id_for(attributes[:hours_of_operation_id])
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
@@ -55,7 +79,7 @@ resource "#{terraform_resource_name}" "#{label}" {
             ]
             arr.push("    outbound_caller_id_name=\"#{attributes[:outbound_caller_config][:outbound_caller_id_name]}\"") if attributes[:outbound_caller_config][:outbound_caller_id_name]
             arr.push("    outbound_caller_id_number_id=\"#{attributes[:outbound_caller_config][:outbound_caller_id_number_id]}\"") if attributes[:outbound_caller_config][:outbound_caller_id_number_id]
-            contact_flow = instance.contact_flow_by_id_for(attributes[:outbound_caller_config][:outbound_flow_id])
+            contact_flow = instance.contact_flow_by_id_for(attributes[:outbound_caller_config][:outbound_flow_id]) || attributes[:outbound_caller_config][:outbound_flow_id]
             if contact_flow
               arr.push("    outbound_flow_id=#{contact_flow.terraform_reference}")
             end
@@ -63,8 +87,8 @@ resource "#{terraform_resource_name}" "#{label}" {
             f.write arr.join("\n")
           end
           f.write <<-TEMPLATE
-            tags = var.tags
-          }
+  tags = var.tags
+}
           TEMPLATE
         end
       end

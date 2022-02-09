@@ -16,6 +16,10 @@ module Blergy
         Aws::Connect::Client
       end
 
+      def environment
+        instance.environment
+      end
+
       def client
         @client ||= begin
           self.class.client_class.new(region: region, credentials: self.class.credentials)
@@ -25,6 +29,13 @@ module Blergy
       def name
         attributes["name"] || attributes[:name]
       end
+      def arn
+        attributes[:arn]
+      end
+      def id
+        attributes[:id]
+      end
+
       def label
         fred = name.gsub(/\W+/,'_').gsub(/_$/,'').downcase
         fred = "_#{fred}" if(fred =~ /^\d/) # terraform variables can't start with a digit

@@ -12,6 +12,7 @@ module Blergy
       attr_accessor :users
       attr_accessor :security_profiles
       attr_accessor :routing_profiles
+      attr_accessor :environment
 
       def hours_of_operations
         # can't write a valid template unless you actually define some valid hours of operation, which is in the
@@ -31,11 +32,13 @@ module Blergy
         @queues[key]=obj
       end
 
-      def initialize(connect_instance_id, target_directory, region)
+      def initialize(connect_instance_id, target_directory, region, environment='production')
         self.connect_instance_id = connect_instance_id
         self.target_directory=target_directory
         self.region = region
+        self.environment = environment
         self.attributes={name: 'connect'}
+        read
       end
 
       def label
@@ -68,6 +71,9 @@ module Blergy
       def queue_by_id_for(id)
         queues.detect{|k,v| k =~ /#{id}$/}&.at(1)
       end
+      def queue_by_name_for(name)
+        queues.values.detect{|v| v.name == name}
+      end
       def queue_quick_connect_for(arn)
         queue_quick_connects[arn]
       end
@@ -77,15 +83,38 @@ module Blergy
       def hours_of_operation_by_id_for(id)
         hours_of_operations.detect{|k,v| k =~ /#{id}$/}&.at(1)
       end
+      def hours_of_operation_by_name_for(name)
+        hours_of_operations.values.detect{|v| v.name == name}
+      end
+      def security_profile_by_id_for(id)
+        security_profiles.detect{|k,v| k =~ /#{id}$/}&.at(1)
+      end
+      def routing_profile_by_name_for(name)
+        routing_profiles.values.detect{|v| v.name == name}
+      end
+
       def contact_flow_for(contact_flow_arn)
 # for example: arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3/contact-flow/fc7e607a-a89f-45b9-8346-0d9a497d03b1
         flows[contact_flow_arn]
       end
-
+      def contact_flow_by_name_for(name)
+        flows.values.detect{|v| v.name == name}
+      end
       def contact_flow_by_id_for(contact_flow_id)
 # for example: arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3/contact-flow/fc7e607a-a89f-45b9-8346-0d9a497d03b1
         flows.detect{|k,v| k =~ /#{contact_flow_id}$/}&.at(1)
       end
+
+      def user_for_by_name(user_name)
+        users.values.detect{|v| v.name == user_name}
+      end
+
+      def user_for_by_id(id)
+        users.values.detect{|v| v.id == id}
+      end
+
+
+
 
       def lambda_function_for(arn)
 # for example: arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3/contact-flow/fc7e607a-a89f-45b9-8346-0d9a497d03b1
@@ -136,15 +165,39 @@ module Blergy
           end
         end
       end
-      def dump_users
+      # move the users, queue_quick_connects, queues, and routing profiles to staging.
+      # for now, just migrate the users and routing profiles.
+      def migrate_part_1(staging_instance_id)
+        staging_instance = self.class.new(staging_instance_id, target_directory, region, :staging)
+        queues.values.reject {|queue| staging_instance.queue_by_name_for(queue.name)}.each do |queue|
+          queue.create(staging_instance)
+        end
+        Queue.write_templates(staging_instance, "#{target_directory}/environments/#{staging_instance.environment}/queues",:queues,[:flows_map])
+
+        puts "you must now run terraform plan/apply so that the staging instance can harvest the queue ids, then run migrate_part_2"
       end
 
-      def dump(options)
-        # dump_lambda_functions
-        # raise "hell"
+      def migrate_part_2(staging_instance_id)
+        staging_instance = self.class.new(staging_instance_id, target_directory, region, :staging)
+        routing_profiles.values.reject {|routing_profile| staging_instance.routing_profile_by_name_for(routing_profile.name)}.each do |routing_profile|
+          routing_profile.create(staging_instance)
+        end
+        users.values.reject {|user| staging_instance.user_by_name_for(user.name)}.each do |user|
+          user.create(staging_instance)
+        end
+        migrate_queue_quick_connects(staging_instance)
+        puts "you must now run terraform plan/apply to finish the job"
+      end
+
+      def migrate_queue_quick_connects(staging_instance)
+        staging_instance.queue_quick_connects={}
+        queue_quick_connects.values.each do |obj|
+          obj.create(staging_instance)
+        end
+      end
+
+      def read
         self.attributes = client.describe_instance({instance_id: connect_instance_id}).instance
-        # puts "attributes=#{attributes.instance_alias}"
-        store_stage_variable("instance_alias",attributes.instance_alias)
         ContactFlow.read(self)
         LambdaFunctionAssociation.read(self)
         LambdaFunction.read(self)
@@ -154,53 +207,12 @@ module Blergy
         User.read(self)
         RoutingProfile.read(self)
         SecurityProfile.read(self)
-
-# environments in gm-microservices do not contain different services, they are instead different AWS accounts
-# we want a connect AWS project
-# we want to only support py and js lambdas projects, probably not worth supporting ruby
-# modules are being used to reuse lambda resource configuration for different AWS S3 resource sources.
-# we want a minimal staging implementation, with only a few queues and users
-# we want a cleaned up set of production users. No Christina, for example.
-
-        # contact-flow-modules - there are none.
-# users (specific to Connect)
-# here are the basic parameters for a user:
-# --phone-config <value>
-# [--directory-user-id <value>]
-# --security-profile-ids <value>
-# --routing-profile-id <value>
-# [--hierarchy-group-id <value>]
-
-# which means we need security and routing profiles
-# routing profiles can be created via the CLI, but not via terraform
-# security profiles can be created via the CLI, and via terraform beta.
-#
-
-# looks like the prompts are not directly managed via Connect, instead they are simply
-# uploaded??? They are certainly referenced in the ContactFlows via name.
-# but there is no terraform resource for them
-#
-# puts "prompts!"
-# client.list_prompts(instance_id: connect_instance_id).prompt_summary_list.each_with_index do |hash, index|
-#   puts "\nprompt[#{index} #{hash.to_h}"
-# end
-# which gives only:
-#  {:id=>"f518d0fe-3cb7-470e-9c39-32a68e8418a8",
-#  :arn=>"arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3/prompt/f518d0fe-3cb7-470e-9c39-32a68e8418a8",
-#  :name=>"Music - Rock_EverywhereTheSunShines_Inst.wav"
-#  }
-
-
-# lambdas can be dumped but I think that all of the infrastructure for converting a javascript file into a .zip
-# file for uploading to lambda might be in the gm-microservices project.
-        # dump lambdas
-# lambdas are a simple association between the instance and the arn of the lambda.
-# that is supported by ResourceLambdaFunctionAssociation() terraform in beta.
-# so for each lambda you need to
-# 1. get the list of arns
-# 2. create the actual lambda resource in a different place aws_lambda_function
-#
-        # write_environments
+      end
+      def dump(options)
+        # dump_lambda_functions
+        # raise "hell"
+        # puts "attributes=#{attributes.instance_alias}"
+        store_stage_variable("instance_alias",attributes.instance_alias)
         write_templates
       end
 
@@ -286,11 +298,11 @@ resource "aws_connect_instance" "#{label}" {
         end
 
         # %W(hours_of_operations_map flows_map security_profiles_map)
-        LambdaFunction.write_templates(self, "#{target_directory}/modules/lambdas", :lambda_functions)
-        if(false)
         ContactFlow.write_templates(self, "#{target_directory}/modules/connect/flows",:flows, [:queues_map, :lambda_map])
+        if(false)
+        LambdaFunction.write_templates(self, "#{target_directory}/modules/lambdas", :lambda_functions)
         HoursOfOperation.write_templates(self, "#{target_directory}/modules/connect/hours", :hours_of_operations,[])
-        Queue.write_templates(self, "#{target_directory}/environments/production/queues",:queues,[:flows_map, :lambda_map])
+        Queue.write_templates(self, "#{target_directory}/environments/#{environment}/queues",:queues,[:flows_map])
         SecurityProfile.write_templates(self, "#{target_directory}/modules/connect/security_profile",:security_profiles,[])
         LambdaFunctionAssociation.write_templates(self, "#{target_directory}/modules/connect/lambda_function_associations", :lambda_function_associations,[:lambda_map])
           queue_quick_connects.values.map(&:write_templates)
@@ -305,16 +317,3 @@ resource "aws_connect_instance" "#{label}" {
     end
   end
 end
-
-# dynamodb.
-
-# {:id=>"03103f71-db62-4f61-9432-4bfae356b3e3"
-# :arn=>"arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3"
-# :identity_management_type=>"CONNECT_MANAGED"
-# :instance_alias=>"[FILTERED]"
-# :created_time=>2019-07-29 14:55:37 -0400
-# :service_role=>"arn:aws:iam::201706955376:role/aws-service-role/connect.amazonaws.com/AWSServiceRoleForAmazonConnect_HBDQRkK8TkflREzD1NkM"
-# :instance_status=>"ACTIVE"
-# :status_reason=>nil
-# :inbound_calls_enabled=>true
-# :outbound_calls_enabled=>true}

@@ -21,18 +21,30 @@ module Blergy
 
   class Error < StandardError; end
   class Main < Thor
-    option :filter, type: :array
     option :region, required: false, default: 'us-east-1'
-    desc "dump", "dump connect-instance-id target-directory [--filter <regex1> <regex2> ...] --region us-east-1"
+    desc "dump", "dump connect-instance-id target-directory --region us-east-1"
     long_desc <<-DOC
-      --filter lets you filter out AWS connect flows that you don't want, like test flows.
       Example:
-      blergy dump 12343134 my-terraform-project --filter TEST ^Hacking
+      blergy dump 03103f71-db62-4f61-9432-4bfae356b3e3 my-terraform-project-dir
       --region defaults to us-east-1
     DOC
     def dump(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/connect')
       check_aws_config
       AWS::Instance.new(connect_instance, target_directory, options[:region] || 'us-east-1').dump(options)
+    end
+
+    option :region, required: false, default: 'us-east-1'
+    desc "migrate_part_1", "migrate_part_1 production-instance staging-instance  my-terraform-project-dir --region us-east-1"
+    def migrate_part_1(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='dd059383-476d-45dc-b952-6ffbbe831e84', target_directory='/Users/rob/Projects/GoodMeasures/connect')
+      production=AWS::Instance.new(production, target_directory, options[:region] || 'us-east-1')
+      production.migrate_part_1(staging)
+    end
+
+    option :region, required: false, default: 'us-east-1'
+    desc "migrate_part_2", "migrate_part_2 production-instance staging-instance  my-terraform-project-dir --region us-east-1"
+    def migrate_part_2(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='dd059383-476d-45dc-b952-6ffbbe831e84', target_directory='/Users/rob/Projects/GoodMeasures/connect')
+      production=AWS::Instance.new(connect_instance, target_directory, options[:region] || 'us-east-1')
+      production.migrate_part_2(staging)
     end
     desc "debug", "stuff"
     def debug(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/terraform')
