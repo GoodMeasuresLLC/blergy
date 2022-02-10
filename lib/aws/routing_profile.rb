@@ -37,7 +37,7 @@ module Blergy
       def create(staging_instance)
         cmd = %Q{
           aws connect create-routing-profile \\
-          --instance_id #{staging_instance.connect_instance_id} \\
+          --instance-id #{staging_instance.connect_instance_id} \\
           --cli-input-json #{for_staging(staging_instance).to_json}
         }
         puts cmd

@@ -135,7 +135,10 @@ end
         instance.with_rate_limit do |client|
           client.list_queues(instance_id: instance.connect_instance_id, max_results: 1000).queue_summary_list.each do |hash|
             puts "#{hash.name} #{hash.arn}"
-            next unless hash.name
+            unless hash.name
+                puts "Skipping #{hash.arn}"
+                next
+            end
             instance.with_rate_limit do
               instance.add_queue(hash.arn,self.new(instance, hash))
             end
