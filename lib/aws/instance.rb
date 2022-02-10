@@ -178,7 +178,7 @@ module Blergy
         queues.values.reject {|queue| staging_instance.queue_by_name_for(queue.name)}.each do |queue|
           queue.create(staging_instance)
         end
-        Queue.write_templates(staging_instance, "#{target_directory}/environments/#{staging_instance.environment}/queues",:queues,[:flows_map])
+        Queue.write_templates(staging_instance, "#{target_directory}/environments/#{staging_instance.environment}/queues",:queues,[:flows_map, :hours_of_operations_map])
 
         puts "you must now run terraform plan/apply so that the staging instance can harvest the queue ids, then run migrate_part_2"
       end
