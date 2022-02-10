@@ -69,6 +69,7 @@ module Blergy
         queues[arn]
       end
       def queue_by_id_for(id)
+        return nil if id.nil?
         queues.detect{|k,v| k =~ /#{id}$/}&.at(1)
       end
       def queue_by_name_for(name)
@@ -101,6 +102,7 @@ module Blergy
         flows.values.detect{|v| v.name == name}
       end
       def contact_flow_by_id_for(contact_flow_id)
+        return nil if contact_flow_id.nil?
 # for example: arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3/contact-flow/fc7e607a-a89f-45b9-8346-0d9a497d03b1
         flows.detect{|k,v| k =~ /#{contact_flow_id}$/}&.at(1)
       end
@@ -169,6 +171,10 @@ module Blergy
       # for now, just migrate the users and routing profiles.
       def migrate_part_1(staging_instance_id)
         staging_instance = self.class.new(staging_instance_id, target_directory, region, :staging)
+        flows.each_pair {|k,v|
+          v.instance=staging_instance
+          staging_instance.flows[k] = v
+        }
         queues.values.reject {|queue| staging_instance.queue_by_name_for(queue.name)}.each do |queue|
           queue.create(staging_instance)
         end
@@ -179,6 +185,7 @@ module Blergy
 
       def import
         hours_of_operations.values.map(&:import)
+        flows.values.map(&:import)
         security_profiles.values.map(&:import)
         # lambda_functions.values.map(&:import)
       end
@@ -307,11 +314,11 @@ resource "aws_connect_instance" "#{label}" {
         ContactFlow.write_templates(self, "#{target_directory}/modules/connect/flows",:flows, [:queues_map, :lambda_functions_map])
         Queue.write_templates(self, "#{target_directory}/environments/#{environment}/queues",:queues,[:hours_of_operations_map, :flows_map])
         LambdaFunctionAssociation.write_templates(self, "#{target_directory}/modules/connect/lambda_function_associations", :lambda_function_associations,[:lambda_functions_map])
+        queue_quick_connects.values.map(&:write_templates)
         if(false)
         LambdaFunction.write_templates(self, "#{target_directory}/modules/lambdas", :lambda_functions)
         HoursOfOperation.write_templates(self, "#{target_directory}/modules/connect/hours", :hours_of_operations,[])
         SecurityProfile.write_templates(self, "#{target_directory}/modules/connect/security_profile",:security_profiles,[])
-          queue_quick_connects.values.map(&:write_templates)
           users.values.map(&:write_templates)
           routing_profiles.values.map(&:write_templates)
           # dump a json of all prompts, since that's all I can do:

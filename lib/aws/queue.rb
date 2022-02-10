@@ -41,9 +41,7 @@ module Blergy
         queue.attributes = attributes.deep_clone
         tmp = instance.hours_of_operation_by_id_for(attributes[:hours_of_operation_id])
         queue.attributes[:hours_of_operation_id]=staging_instance.hours_of_operation_by_name_for(tmp.name).id
-        if(queue.attributes[:outbound_caller_config])
-          queue.attributes[:outbound_caller_config][:outbound_caller_id_number_id]=nil
-        end
+        queue.attributes[:outbound_caller_config].delete(:outbound_caller_config)
         if(attributes.dig(:outbound_caller_config,:outbound_flow_id))
           tmp = instance.contact_flow_by_id_for(attributes[:outbound_caller_config][:outbound_flow_id])
           outbound_flow = staging_instance.contact_flow_by_name_for(tmp.name)

@@ -65,6 +65,11 @@ module Blergy
       def accessor_name
         :flows
       end
+
+      def terraform_module_name
+        "module.connect.module.flows.aws_connect_contact_flow.#{label}"
+      end
+
       def terraform_key
         "contact_flow_id"
       end
