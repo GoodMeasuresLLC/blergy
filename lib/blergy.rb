@@ -35,20 +35,31 @@ module Blergy
 
     option :region, required: false, default: 'us-east-1'
     desc "migrate_part_1", "migrate_part_1 production-instance staging-instance  my-terraform-project-dir --region us-east-1"
-    def migrate_part_1(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='dd059383-476d-45dc-b952-6ffbbe831e84', target_directory='/Users/rob/Projects/GoodMeasures/connect')
+    def migrate_part_1(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='1be1f972-2ec2-47db-b57a-8152c0098abe', target_directory='/Users/rob/Projects/GoodMeasures/connect')
       production=AWS::Instance.new(production, target_directory, options[:region] || 'us-east-1')
       production.migrate_part_1(staging)
     end
 
     option :region, required: false, default: 'us-east-1'
     desc "migrate_part_2", "migrate_part_2 production-instance staging-instance  my-terraform-project-dir --region us-east-1"
-    def migrate_part_2(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='dd059383-476d-45dc-b952-6ffbbe831e84', target_directory='/Users/rob/Projects/GoodMeasures/connect')
+    def migrate_part_2(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='1be1f972-2ec2-47db-b57a-8152c0098abe', target_directory='/Users/rob/Projects/GoodMeasures/connect')
       production=AWS::Instance.new(connect_instance, target_directory, options[:region] || 'us-east-1')
       production.migrate_part_2(staging)
     end
+
+    option :region, required: false, default: 'us-east-1'
+    desc "import", "migrate staging-instance  my-terraform-project-dir --region us-east-1"
+    def import(staging='1be1f972-2ec2-47db-b57a-8152c0098abe')
+      staging=AWS::Instance.new(staging,target_directory='/Users/rob/Projects/GoodMeasures/connect','us-east-1','staging')
+      staging.import
+    end
     desc "debug", "stuff"
-    def debug(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/terraform')
-      AWS::Instance.new(connect_instance, "#{target_directory}/terraform", options[:region] || 'us-east-1')
+    def debug(connect_instance='03103f71-db62-4f61-9432-4bfae356b3e3', target_directory='/Users/rob/Projects/GoodMeasures/connect')
+      path = '/Users/rob/Projects/GoodMeasures/connect/modules/connect/flows/_00_Routing_Flow.json'
+      file = File.read(path)
+      hash=JSON.parse(file)
+      variablize_content(hash)
+      # AWS::Instance.new(connect_instance, "#{target_directory}/terraform", options[:region] || 'us-east-1')
     end
 
     no_commands do

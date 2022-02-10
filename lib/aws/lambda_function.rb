@@ -33,6 +33,10 @@ module Blergy
         "arn"
       end
 
+      def terraform_reference
+        "var.lambda_functions_map[\"#{label}\"]"
+      end
+
       def accessor_name
         :lambda_functions
       end

@@ -32,7 +32,7 @@ module Blergy
         @queues[key]=obj
       end
 
-      def initialize(connect_instance_id, target_directory, region, environment='production')
+      def initialize(connect_instance_id, target_directory=nil, region='us-east-1', environment='production')
         self.connect_instance_id = connect_instance_id
         self.target_directory=target_directory
         self.region = region
@@ -177,6 +177,12 @@ module Blergy
         puts "you must now run terraform plan/apply so that the staging instance can harvest the queue ids, then run migrate_part_2"
       end
 
+      def import
+        hours_of_operations.values.map(&:import)
+        security_profiles.values.map(&:import)
+        # lambda_functions.values.map(&:import)
+      end
+
       def migrate_part_2(staging_instance_id)
         staging_instance = self.class.new(staging_instance_id, target_directory, region, :staging)
         routing_profiles.values.reject {|routing_profile| staging_instance.routing_profile_by_name_for(routing_profile.name)}.each do |routing_profile|
@@ -298,13 +304,13 @@ resource "aws_connect_instance" "#{label}" {
         end
 
         # %W(hours_of_operations_map flows_map security_profiles_map)
-        ContactFlow.write_templates(self, "#{target_directory}/modules/connect/flows",:flows, [:queues_map, :lambda_map])
+        ContactFlow.write_templates(self, "#{target_directory}/modules/connect/flows",:flows, [:queues_map, :lambda_functions_map])
+        Queue.write_templates(self, "#{target_directory}/environments/#{environment}/queues",:queues,[:hours_of_operations_map, :flows_map])
+        LambdaFunctionAssociation.write_templates(self, "#{target_directory}/modules/connect/lambda_function_associations", :lambda_function_associations,[:lambda_functions_map])
         if(false)
         LambdaFunction.write_templates(self, "#{target_directory}/modules/lambdas", :lambda_functions)
         HoursOfOperation.write_templates(self, "#{target_directory}/modules/connect/hours", :hours_of_operations,[])
-        Queue.write_templates(self, "#{target_directory}/environments/#{environment}/queues",:queues,[:flows_map])
         SecurityProfile.write_templates(self, "#{target_directory}/modules/connect/security_profile",:security_profiles,[])
-        LambdaFunctionAssociation.write_templates(self, "#{target_directory}/modules/connect/lambda_function_associations", :lambda_function_associations,[:lambda_map])
           queue_quick_connects.values.map(&:write_templates)
           users.values.map(&:write_templates)
           routing_profiles.values.map(&:write_templates)

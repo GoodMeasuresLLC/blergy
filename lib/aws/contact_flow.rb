@@ -1,7 +1,17 @@
 class Hash
   def each_with_parent(parent=nil, &blk)
     each do |k, v|
-      Hash === v ? v.each_with_parent(k, &blk) : blk.call([parent, self, k, v])
+      case
+      when v.kind_of?(Hash) then v.each_with_parent(k, &blk)
+      when v.kind_of?(Array)
+        if v.first.kind_of?(Hash)
+          v.each { |ele| ele.each_with_parent(nil, &blk) }
+        else
+          blk.call([parent, self, k, v])
+        end
+      else
+        blk.call([parent, self, k, v])
+      end
     end
   end
   def deep_clone
@@ -26,22 +36,21 @@ module Blergy
         fred=content.deep_clone
         fred.each_with_parent do |parent, hash, k, v|
           next unless parent
-          puts "#{parent}/#{k}"
-          if parent.downcase =~ /contactflow|contactflowid/ && value.to_s =~ /arn:/
+          if parent.downcase =~ /contact-flow|contactflow|contactflowid/ && v.to_s =~ /arn:/
             contact_flow = instance.contact_flow_by_id_for(hash["id"])
             if contact_flow
-              hash["id"] = "#{contact_flow&.terraform_reference}}"
-              hash["text"] = "#{contact_flow&.attributes[:text]}"
+              hash["id"] = "${#{contact_flow&.terraform_reference}}"
+              hash["text"] = "#{contact_flow&.name}"
             end
-          elsif parent.downcase =~ /queue|customerqueue|queueid/ && value.to_s =~ /arn:/
+          elsif parent.downcase =~ /queue|customerqueue|queueid/ && v.to_s =~ /arn:/
             queue = instance.queue_for(hash["id"])
             if queue
               hash["id"] = "${#{queue&.terraform_reference}}"
-              hash["text"] = "#{queue&.attributes[:text]}"
+              hash["text"] = "#{queue&.name}"
             end
-          elsif k == "ContactFlowId" && value.to_s =~ /arn:/
+          elsif k == "ContactFlowId" && v.to_s =~ /arn:/
             hash[k]="${#{instance.contact_flow_by_id_for(hash[k]).terraform_reference}}"
-          elsif k == "LambdaFunctionARN" && value.to_s =~ /arn:/
+          elsif k == "LambdaFunctionARN" && v.to_s =~ /arn:/
             lambda = instance.lambda_function_for(hash[k])
             hash[k]="${#{lambda.terraform_reference}}"
           end
@@ -56,7 +65,6 @@ module Blergy
       def accessor_name
         :flows
       end
-
       def terraform_key
         "contact_flow_id"
       end
@@ -77,8 +85,8 @@ resource "#{terraform_resource_name}" "#{label}" {
   name         = "#{name}"
   type         = "#{attributes[:type]}"
   description  = "#{attributes[:description]}"
-  filename     = "#{file_name}"
-  content_hash = filebase64sha256("#{file_name}")
+  filename     = "${path.module}/#{file_name}"
+  content_hash = filebase64sha256("${path.module}/#{file_name}")
   tags = var.tags
 }
           TEMPLATE

@@ -28,6 +28,10 @@ module Blergy
         "#{instance.target_directory}/modules/connect/security_profile"
       end
 
+      def terraform_module_name
+        "module.connect.module.security_profiles.aws_connect_security_profile.#{label}"
+      end
+
       def accessor_name
         :security_profiles
       end

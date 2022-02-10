@@ -16,6 +16,17 @@ module Blergy
         Aws::Connect::Client
       end
 
+# module.connect.module.flows.aws_connect_contact_flow
+      def terraform_module_name
+        "module.connect.module.#{accessor_name}.#{terraform_resource_name}"
+      end
+# terraform import aws_connect_queue.example f1288a1f-6193-445a-b47e-af739b2:c1d4e5f6-1b3c-1b3c-1b3c-c1d4e5f6c1d4e5
+      def import
+        cmd = "cd #{instance.target_directory}/environments/#{instance.environment};terraform import #{terraform_module_name} #{instance_id}:#{id}"
+        puts cmd
+        puts `#{cmd}`
+      end
+
       def environment
         instance.environment
       end
@@ -34,6 +45,10 @@ module Blergy
       end
       def id
         attributes[:id]
+      end
+
+      def instance_id
+        instance.connect_instance_id
       end
 
       def label

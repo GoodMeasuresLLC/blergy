@@ -11,6 +11,11 @@ module Blergy
         "#{instance.target_directory}/modules/connect/hours"
       end
 
+      def terraform_module_name
+        "module.connect.module.connect_hours.aws_connect_hours_of_operation.#{label}"
+      end
+
+
       def accessor_name
         :hours_of_operations
       end

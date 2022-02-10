@@ -42,7 +42,6 @@ module Blergy
         tmp = instance.hours_of_operation_by_id_for(attributes[:hours_of_operation_id])
         queue.attributes[:hours_of_operation_id]=staging_instance.hours_of_operation_by_name_for(tmp.name).id
         if(queue.attributes[:outbound_caller_config])
-          queue.attributes[:outbound_caller_config][:outbound_caller_id_name]=nil
           queue.attributes[:outbound_caller_config][:outbound_caller_id_number_id]=nil
         end
         if(attributes.dig(:outbound_caller_config,:outbound_flow_id))
@@ -65,7 +64,13 @@ module Blergy
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
 resource "#{terraform_resource_name}" "#{label}" {
+  TEMPLATE
+  unless(attributes[:description].nil? || attributes[:description] == "")
+          f.write <<-TEMPLATE
   description  = "#{attributes[:description]}"
+  TEMPLATE
+end
+          f.write <<-TEMPLATE
   hours_of_operation_id = #{hours_of_operation.terraform_reference}
   instance_id  = #{instance.terraform_reference}
           TEMPLATE
@@ -87,6 +92,7 @@ resource "#{terraform_resource_name}" "#{label}" {
             f.write arr.join("\n")
           end
           f.write <<-TEMPLATE
+
   tags = var.tags
 }
           TEMPLATE
@@ -129,7 +135,8 @@ resource "#{terraform_resource_name}" "#{label}" {
       def self.read(instance)
         instance.queues={}
         instance.with_rate_limit do |client|
-          client.list_queues(instance_id: instance.connect_instance_id).queue_summary_list.each do |hash|
+          client.list_queues(instance_id: instance.connect_instance_id, max_results: 1000).queue_summary_list.each do |hash|
+            puts "#{hash.name} #{hash.arn}"
             next unless hash.name
             instance.with_rate_limit do
               instance.add_queue(hash.arn,self.new(instance, hash))
