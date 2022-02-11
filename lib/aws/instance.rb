@@ -98,6 +98,12 @@ module Blergy
       def security_profile_by_id_for(id)
         security_profiles.detect{|k,v| k =~ /#{id}$/}&.at(1)
       end
+      def security_profile_by_name_for(name)
+        security_profiles.values.detect{|v| v.name == name}
+      end
+      def routing_profile_by_id_for(id)
+        routing_profiles.detect{|k,v| k =~ /#{id}$/}&.at(1)
+      end
       def routing_profile_by_name_for(name)
         routing_profiles.values.detect{|v| v.name == name}
       end
@@ -115,11 +121,11 @@ module Blergy
         contact_flows.detect{|k,v| k =~ /#{contact_flow_id}$/}&.at(1)
       end
 
-      def user_for_by_name(user_name)
+      def user_by_name_for(user_name)
         users.values.detect{|v| v.name == user_name}
       end
 
-      def user_for_by_id(id)
+      def user_by_id_for(id)
         users.values.detect{|v| v.id == id}
       end
 
@@ -201,13 +207,12 @@ module Blergy
 
       def migrate_part_2(staging_instance_id)
         staging_instance = self.class.new(staging_instance_id, target_directory, region, :staging)
-        routing_profiles.values.reject {|routing_profile| staging_instance.routing_profile_by_name_for(routing_profile.name)}.each do |routing_profile|
-          routing_profile.create(staging_instance)
-        end
+        # routing_profiles.values.reject {|routing_profile| staging_instance.routing_profile_by_name_for(routing_profile.name)}.each do |routing_profile|
+        #   routing_profile.create(staging_instance)
+        # end
         users.values.reject {|user| staging_instance.user_by_name_for(user.name)}.each do |user|
           user.create(staging_instance)
         end
-        migrate_queue_quick_connects(staging_instance)
         puts "you must now run terraform plan/apply to finish the job"
       end
 
@@ -220,12 +225,12 @@ module Blergy
 
       def read
         self.attributes = client.describe_instance({instance_id: connect_instance_id}).instance
-        LambdaFunctionAssociation.read(self)
-        ContactFlow.read(self)
-        LambdaFunction.read(self)
-        Queue.read(self)
+        # LambdaFunctionAssociation.read(self)
+        # ContactFlow.read(self)
+        # LambdaFunction.read(self)
+        # Queue.read(self)
         QueueQuickConnect.read(self)
-        HoursOfOperation.read(self)
+        # HoursOfOperation.read(self)
         User.read(self)
         RoutingProfile.read(self)
         SecurityProfile.read(self)
