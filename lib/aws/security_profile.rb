@@ -24,6 +24,10 @@ module Blergy
         end
       end
 
+      def terraform_module_name
+        "module.connect.module.#{accessor_name}.#{terraform_resource_name}.#{label}"
+      end
+
       def self.modules_dir(instance)
         "#{instance.target_directory}/modules/connect/security_profiles"
       end

@@ -18,6 +18,11 @@ module Blergy
         []
       end
 
+# module.contact_flows.aws_connect_contact_flow.sample_secure_input_with_no_agent
+      def terraform_module_name
+        "module.connect.module.#{accessor_name}.#{terraform_resource_name}.#{label}"
+      end
+
       def terraform_key
         "hours_of_operation_id"
       end

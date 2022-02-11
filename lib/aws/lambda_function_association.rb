@@ -33,10 +33,9 @@ module Blergy
         lambda_function = instance.lambda_function_for(attributes[:arn])
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|
           f.write <<-TEMPLATE
-resource "#{terraform_resource_name}"{
+resource "#{terraform_resource_name}" "#{label}"{
   instance_id  = var.connect_instance_id
   function_arn         = #{lambda_function.terraform_reference}
-  tags = var.tags
 }
           TEMPLATE
         end

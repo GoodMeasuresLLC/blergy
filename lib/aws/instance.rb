@@ -194,7 +194,7 @@ module Blergy
 
       def import
         hours_of_operations.values.map(&:import)
-        contact_flows.values.map(&:import)
+        contact_flows.values.map(&:import) #$ Connect Contact Flow
         security_profiles.values.map(&:import)
         # lambda_functions.values.map(&:import)
       end
@@ -220,8 +220,8 @@ module Blergy
 
       def read
         self.attributes = client.describe_instance({instance_id: connect_instance_id}).instance
-        ContactFlow.read(self)
         LambdaFunctionAssociation.read(self)
+        ContactFlow.read(self)
         LambdaFunction.read(self)
         Queue.read(self)
         QueueQuickConnect.read(self)
@@ -320,12 +320,11 @@ resource "aws_connect_instance" "#{label}" {
           TEMPLATE
         end
 
-        # %W(hours_of_operations_map flows_map security_profiles_map)
-        ContactFlow.write_templates(self)
-        Queue.write_templates(self)
         LambdaFunctionAssociation.write_templates(self)
+        Queue.write_templates(self)
+        if(false)
         QueueQuickConnect.write_templates(self)
-        if(true)
+        ContactFlow.write_templates(self)
         LambdaFunction.write_templates(self)
         HoursOfOperation.write_templates(self)
         SecurityProfile.write_templates(self)

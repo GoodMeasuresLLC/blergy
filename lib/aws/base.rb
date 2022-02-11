@@ -15,10 +15,9 @@ module Blergy
       def self.client_class
         Aws::Connect::Client
       end
-
-# module.connect.module.flows.aws_connect_contact_flow
+# module.contact_flows.aws_connect_contact_flow.sample_secure_input_with_no_agent
       def terraform_module_name
-        "module.connect.module.#{accessor_name}.#{terraform_resource_name}"
+        "module.#{accessor_name}.#{terraform_resource_name}.#{label}"
       end
 # terraform import aws_connect_queue.example f1288a1f-6193-445a-b47e-af739b2:c1d4e5f6-1b3c-1b3c-1b3c-c1d4e5f6c1d4e5
       def import
