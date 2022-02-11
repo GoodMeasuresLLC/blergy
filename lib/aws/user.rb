@@ -7,10 +7,15 @@ module Blergy
         self.attributes={}.merge instance.client.describe_user(instance_id: instance.connect_instance_id, user_id: hash['id']).user
       end
 
-      def modules_dir
-        "#{instance.target_directory}/environments/#{environment}/users"
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/environments/#{instance.environment}/users"
       end
-
+      def self.resource_name
+        :users
+      end
+      def self.dependencies
+        [:routing_profiles_map, :security_profiles_map]
+      end
       def name
         attributes[:username]
       end

@@ -7,33 +7,25 @@ module Blergy
         self.attributes= {arn: arn}
         attributes[:name]=attributes[:arn].match(%r(arn:aws:(?:.+):(?:.+):(.+)))[1]
       end
-
-      def modules_dir
+      def self.modules_dir(instance)
         "#{instance.target_directory}/modules/connect/lambda_function_associations"
       end
-
-      def accessor_name
+      def self.resource_name
         :lambda_function_associations
       end
-
+      def self.dependencies
+        [:lambda_functions_map]
+      end
       def terraform_resource_name
         "aws_connect_lambda_function_association"
       end
 
-      def lambda_terraform_id
-        "aws_lambda_function.#{label}.id"
+      def terraform_key
+        "id"
       end
 
-      def self.write_templates(instance, modules_dir, resource_name, references)
-        FileUtils.mkpath(modules_dir)
-        File.open("#{modules_dir}/variables.tf",'w') do |f|
-          f.write <<-TEMPLATE
-variable "connect_instance_id" {}
-variable "lambda_functions_map" {type = map(any)}
-variable "tags" {}
-          TEMPLATE
-        end
-        instance.send(resource_name).values.map(&:write_templates)
+      def lambda_terraform_id
+        "aws_lambda_function.#{label}.id"
       end
 
       def write_templates

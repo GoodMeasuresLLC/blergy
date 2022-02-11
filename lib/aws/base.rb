@@ -27,8 +27,13 @@ module Blergy
         puts `#{cmd}`
       end
 
+
+
       def environment
         instance.environment
+      end
+      def target_directory
+        instance.target_directory
       end
 
       def client
@@ -76,10 +81,23 @@ module Blergy
         result
       end
 
-      def self.write_templates(instance, modules_dir, resource_name, list)
-        FileUtils.mkpath(modules_dir)
-        File.open("#{modules_dir}/variables.tf",'w') do |f|
-          list.each do |var|
+      def accessor_name
+        self.class.resource_name
+      end
+      def self.resource_name
+        raise "resource_name" # :contact_flows
+      end
+      def self.dependencies
+        raise "dependencies" # [:queues_map, :lambda_functions_map]
+      end
+      def modules_dir
+        self.class.modules_dir(instance)
+      end
+
+      def self.write_templates(instance)
+        FileUtils.mkpath(modules_dir(instance))
+        File.open("#{modules_dir(instance)}/variables.tf",'w') do |f|
+          dependencies.each do |var|
             f.write %Q{variable "#{var}" {type = map(any)}\n}
           end
           f.write <<-TEMPLATE
@@ -87,7 +105,7 @@ variable "connect_instance_id" {}
 variable "tags" {}
           TEMPLATE
         end
-        File.open("#{modules_dir}/outputs.tf",'w') do |f|
+        File.open("#{modules_dir(instance)}/outputs.tf",'w') do |f|
           f.write <<-TEMPLATE
 output "#{resource_name}_map" {
   value = {

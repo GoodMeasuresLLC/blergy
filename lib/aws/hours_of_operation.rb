@@ -7,17 +7,15 @@ module Blergy
         self.attributes=hash.to_h.merge(instance.client.describe_hours_of_operation(instance_id: instance.connect_instance_id, hours_of_operation_id: hash['id']).hours_of_operation)
       end
 
-      def modules_dir
-        "#{instance.target_directory}/modules/connect/hours"
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/modules/connect/hours_of_operations"
       end
 
-      def terraform_module_name
-        "module.connect.module.connect_hours.aws_connect_hours_of_operation.#{label}"
+      def self.resource_name
+        "hours_of_operations" # :contact_flows
       end
-
-
-      def accessor_name
-        :hours_of_operations
+      def self.dependencies
+        []
       end
 
       def terraform_key

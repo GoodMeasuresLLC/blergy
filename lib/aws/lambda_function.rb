@@ -25,20 +25,17 @@ module Blergy
         "$HERE/../../compiled"
       end
 
-      def modules_dir
-        "#{instance.target_directory}/modules/lambdas"
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/modules/lambda_functions"
       end
-
+      def self.resource_name
+        :lambda_functions
+      end
+      def self.dependencies
+        [:log_retention_days]
+      end
       def terraform_key
         "arn"
-      end
-
-      def terraform_reference
-        "var.lambda_functions_map[\"#{label}\"]"
-      end
-
-      def accessor_name
-        :lambda_functions
       end
 
       def terraform_resource_name
@@ -109,25 +106,7 @@ which also returns configuration.code.location
 
 It is possible the function_name can also be a ARN. It can be in the CLI.
 DOC
-      def self.write_templates(instance, modules_dir, resource_name)
-        FileUtils.mkpath(modules_dir)
-        File.open("#{modules_dir}/variables.tf",'w') do |f|
-          f.write <<-TEMPLATE
-variable "tags" {}
-variable "log_retention_days" {}
-          TEMPLATE
-        end
-        File.open("#{modules_dir}/outputs.tf",'w') do |f|
-          f.write <<-TEMPLATE
-output "#{resource_name}_map" {
-  value = {
-    #{instance.send(resource_name).values.map {|obj| "\"#{obj.label}\" = #{obj.terraform_id}" }.join(",\n")}
-  }
-}
-          TEMPLATE
-        end
-        instance.send(resource_name).values.map(&:write_templates)
-      end
+
 
       def ruby?
         attributes[:runtime] =~ /ruby/

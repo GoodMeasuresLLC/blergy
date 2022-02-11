@@ -7,12 +7,15 @@ module Blergy
         self.attributes=hash.to_h.merge(instance.client.describe_queue(instance_id: instance.connect_instance_id, queue_id: hash['id']).queue) if hash['id']
       end
 
-      def modules_dir
-        "#{instance.target_directory}/environments/#{environment}/queues"
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/environments/#{instance.environment}/queues"
       end
 
-      def accessor_name
+      def self.resource_name
         :queues
+      end
+      def self.dependencies
+        [:hours_of_operations_map, :contact_flows_map]
       end
 
       def terraform_key
@@ -134,11 +137,8 @@ end
         instance.queues={}
         instance.with_rate_limit do |client|
           client.list_queues(instance_id: instance.connect_instance_id, max_results: 1000).queue_summary_list.each do |hash|
-            puts "#{hash.name} #{hash.arn}"
-            unless hash.name
-                puts "Skipping #{hash.arn}"
-                next
-            end
+            puts "\"#{hash.name||"unnamed"}\" #{hash.arn}"
+            next unless hash.name
             instance.with_rate_limit do
               instance.add_queue(hash.arn,self.new(instance, hash))
             end

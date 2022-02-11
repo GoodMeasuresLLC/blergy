@@ -19,18 +19,22 @@ module Blergy
       end
 
       def terraform_key
-        "queue_quick_connect_id"
+        "quick_connect_id"
       end
 
-      def accessor_name
-        :queue_quick_connects
-      end
       def terraform_resource_name
         "aws_connect_quick_connect"
       end
-      def modules_dir
-        "#{instance.target_directory}/environments/#{environment}/queue_quick_connects"
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/environments/#{instance.environment}/queue_quick_connects"
       end
+      def self.resource_name
+      	:queue_quick_connects
+      end
+      def self.dependencies
+      	[]
+      end
+
       def write_templates
         FileUtils.mkpath(modules_dir)
         File.open("#{modules_dir}/#{label}.tf",'w') do |f|

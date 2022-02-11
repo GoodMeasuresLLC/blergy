@@ -24,16 +24,14 @@ module Blergy
         end
       end
 
-      def modules_dir
-        "#{instance.target_directory}/modules/connect/security_profile"
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/modules/connect/security_profiles"
       end
-
-      def terraform_module_name
-        "module.connect.module.security_profiles.aws_connect_security_profile.#{label}"
-      end
-
-      def accessor_name
+      def self.resource_name
         :security_profiles
+      end
+      def self.dependencies
+        []
       end
 
       def terraform_key

@@ -3,7 +3,7 @@ module Blergy
     class Instance < Base
 
       attr_accessor :connect_instance_id
-      attr_accessor :flows
+      attr_accessor :contact_flows
       attr_accessor :hours_of_operations
       attr_accessor :queues
       attr_accessor :queue_quick_connects
@@ -13,6 +13,10 @@ module Blergy
       attr_accessor :security_profiles
       attr_accessor :routing_profiles
       attr_accessor :environment
+
+      def target_directory
+        @target_directory
+      end
 
       def hours_of_operations
         # can't write a valid template unless you actually define some valid hours of operation, which is in the
@@ -58,7 +62,11 @@ module Blergy
       end
 
       def modules_dir
-        "#{target_directory}/modules/connect"
+        self.class.modules_dir(self)
+      end
+
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/modules/connect"
       end
 
       def environment_dir(stage)
@@ -96,15 +104,15 @@ module Blergy
 
       def contact_flow_for(contact_flow_arn)
 # for example: arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3/contact-flow/fc7e607a-a89f-45b9-8346-0d9a497d03b1
-        flows[contact_flow_arn]
+        contact_flows[contact_flow_arn]
       end
       def contact_flow_by_name_for(name)
-        flows.values.detect{|v| v.name == name}
+        contact_flows.values.detect{|v| v.name == name}
       end
       def contact_flow_by_id_for(contact_flow_id)
         return nil if contact_flow_id.nil?
 # for example: arn:aws:connect:us-east-1:201706955376:instance/03103f71-db62-4f61-9432-4bfae356b3e3/contact-flow/fc7e607a-a89f-45b9-8346-0d9a497d03b1
-        flows.detect{|k,v| k =~ /#{contact_flow_id}$/}&.at(1)
+        contact_flows.detect{|k,v| k =~ /#{contact_flow_id}$/}&.at(1)
       end
 
       def user_for_by_name(user_name)
@@ -170,22 +178,23 @@ module Blergy
       # move the users, queue_quick_connects, queues, and routing profiles to staging.
       # for now, just migrate the users and routing profiles.
       def migrate_part_1(staging_instance_id)
+        raise "this is not necessary any more"
         staging_instance = self.class.new(staging_instance_id, target_directory, region, :staging)
-        flows.each_pair {|k,v|
+        contact_flows.each_pair {|k,v|
           v.instance=staging_instance
           staging_instance.flows[k] = v
         }
         queues.values.reject {|queue| staging_instance.queue_by_name_for(queue.name)}.each do |queue|
           queue.create(staging_instance)
         end
-        Queue.write_templates(staging_instance, "#{target_directory}/environments/#{staging_instance.environment}/queues",:queues,[:flows_map, :hours_of_operations_map])
+        Queue.write_templates(staging_instance)
 
         puts "you must now run terraform plan/apply so that the staging instance can harvest the queue ids, then run migrate_part_2"
       end
 
       def import
         hours_of_operations.values.map(&:import)
-        flows.values.map(&:import)
+        contact_flows.values.map(&:import)
         security_profiles.values.map(&:import)
         # lambda_functions.values.map(&:import)
       end
@@ -235,6 +244,7 @@ module Blergy
         queue_quick_connects
         users
         outbound_caller_config
+        contact_flows
         ).each {|dir|
           %W{common staging production}.each do |stage|
             FileUtils.mkpath("#{environment_dir(stage)}/#{dir}")
@@ -311,14 +321,14 @@ resource "aws_connect_instance" "#{label}" {
         end
 
         # %W(hours_of_operations_map flows_map security_profiles_map)
-        ContactFlow.write_templates(self, "#{target_directory}/modules/connect/flows",:flows, [:queues_map, :lambda_functions_map])
-        Queue.write_templates(self, "#{target_directory}/environments/#{environment}/queues",:queues,[:hours_of_operations_map, :flows_map])
-        LambdaFunctionAssociation.write_templates(self, "#{target_directory}/modules/connect/lambda_function_associations", :lambda_function_associations,[:lambda_functions_map])
-        queue_quick_connects.values.map(&:write_templates)
-        if(false)
-        LambdaFunction.write_templates(self, "#{target_directory}/modules/lambdas", :lambda_functions)
-        HoursOfOperation.write_templates(self, "#{target_directory}/modules/connect/hours", :hours_of_operations,[])
-        SecurityProfile.write_templates(self, "#{target_directory}/modules/connect/security_profile",:security_profiles,[])
+        ContactFlow.write_templates(self)
+        Queue.write_templates(self)
+        LambdaFunctionAssociation.write_templates(self)
+        QueueQuickConnect.write_templates(self)
+        if(true)
+        LambdaFunction.write_templates(self)
+        HoursOfOperation.write_templates(self)
+        SecurityProfile.write_templates(self)
           users.values.map(&:write_templates)
           routing_profiles.values.map(&:write_templates)
           # dump a json of all prompts, since that's all I can do:

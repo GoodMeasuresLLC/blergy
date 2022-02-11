@@ -58,16 +58,14 @@ module Blergy
         fred
       end
 
-      def modules_dir
-        "#{instance.target_directory}/modules/connect/flows"
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/environments/#{instance.environment}/contact_flows"
       end
-
-      def accessor_name
-        :flows
+      def self.resource_name
+        :contact_flows
       end
-
-      def terraform_module_name
-        "module.connect.module.flows.aws_connect_contact_flow.#{label}"
+      def self.dependencies
+        [:queues_map, :lambda_functions_map]
       end
 
       def terraform_key
@@ -102,7 +100,7 @@ resource "#{terraform_resource_name}" "#{label}" {
       end
 
       def self.read(instance)
-        instance.flows={}
+        instance.contact_flows={}
         instance.with_rate_limit do |client|
           client.list_contact_flows(instance_id: instance.connect_instance_id).contact_flow_summary_list.each do |hash|
 # id="0179bac6-241f-461d-b1b0-1d525f8bd6fa",
@@ -114,7 +112,7 @@ resource "#{terraform_resource_name}" "#{label}" {
 
            # end
             instance.with_rate_limit do
-              instance.flows[hash.arn]=ContactFlow.new(instance, hash)
+              instance.contact_flows[hash.arn]=ContactFlow.new(instance, hash)
             end
           end
         end

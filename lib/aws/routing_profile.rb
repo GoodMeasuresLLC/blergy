@@ -7,8 +7,14 @@ module Blergy
         self.attributes={}.merge instance.client.describe_routing_profile(instance_id: instance.connect_instance_id, routing_profile_id: hash['id']).routing_profile
       end
 
-      def modules_dir
-        "#{instance.target_directory}/environments/#{environment}/routing_profile"
+      def self.modules_dir(instance)
+        "#{instance.target_directory}/environments/#{instance.environment}/routing_profile"
+      end
+      def self.resource_name
+        :routing_profiles
+      end
+      def self.dependencies
+        [:queues_map]
       end
 
       def write_templates
