@@ -33,28 +33,28 @@ module Blergy
       AWS::Instance.new(connect_instance, target_directory, options[:region] || 'us-east-1', :production).dump(options)
     end
     desc "migrate_part_1", "migrate_part_1 production-instance staging-instance  my-terraform-project-dir --region us-east-1"
-    def dump_staging(connect_instance='d1aad683-fd01-492c-95f8-6c4ab4769e78', target_directory='/Users/rob/Projects/GoodMeasures/connect' )
+    def dump_staging(connect_instance='658aa90c-6c92-4798-a30d-dc8941d65d27', target_directory='/Users/rob/Projects/GoodMeasures/connect' )
       check_aws_config
       AWS::Instance.new(connect_instance, target_directory, options[:region] || 'us-east-1', :staging).dump(options)
     end
 
     option :region, required: false, default: 'us-east-1'
     desc "migrate_part_1", "migrate_part_1 production-instance staging-instance  my-terraform-project-dir --region us-east-1"
-    def migrate_part_1(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='d1aad683-fd01-492c-95f8-6c4ab4769e78', target_directory='/Users/rob/Projects/GoodMeasures/connect')
+    def migrate_part_1(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='658aa90c-6c92-4798-a30d-dc8941d65d27', target_directory='/Users/rob/Projects/GoodMeasures/connect')
       production=AWS::Instance.new(production, target_directory, options[:region] || 'us-east-1')
       production.migrate_part_1(staging)
     end
 
     option :region, required: false, default: 'us-east-1'
     desc "migrate_part_2", "migrate_part_2 production-instance staging-instance  my-terraform-project-dir --region us-east-1"
-    def migrate_part_2(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='d1aad683-fd01-492c-95f8-6c4ab4769e78', target_directory='/Users/rob/Projects/GoodMeasures/connect')
+    def migrate_part_2(production='03103f71-db62-4f61-9432-4bfae356b3e3', staging='658aa90c-6c92-4798-a30d-dc8941d65d27', target_directory='/Users/rob/Projects/GoodMeasures/connect')
       production=AWS::Instance.new(production, target_directory, options[:region] || 'us-east-1', :production)
       production.migrate_part_2(staging)
     end
 
     option :region, required: false, default: 'us-east-1'
     desc "import", "migrate staging-instance  my-terraform-project-dir --region us-east-1"
-    def import(staging='d1aad683-fd01-492c-95f8-6c4ab4769e78')
+    def import(staging='658aa90c-6c92-4798-a30d-dc8941d65d27')
       staging=AWS::Instance.new(staging,target_directory='/Users/rob/Projects/GoodMeasures/connect','us-east-1','staging')
       staging.import
     end

@@ -26,17 +26,17 @@ module Blergy
 
       def for_staging(staging_instance)
         name = instance.queue_by_id_for(attributes[:default_outbound_queue_id]).name
-        queue_id = staging_instance.queue_by_name_for(name)
+        queue_id = (staging_instance.queue_by_name_for(name) || staging_instance.queues.first.last).id
         {
             "Name": attributes[:name],
             "Description": attributes[:description],
-            "DefaultOutboundQueueId": "",
-            "MediaConcurrencies": attributes[:media_concurrencies].transform_keys {|k|
+            "DefaultOutboundQueueId": "#{queue_id}",
+            "MediaConcurrencies": attributes[:media_concurrencies].reject {|h| h[:concurrency].to_i == 0 }.map {|h| h.transform_keys {|k|
               case k
               when :channel then 'Channel'
               when :concurrency then 'Concurrency'
               end
-            },
+            }},
         }
       end
 
@@ -44,14 +44,15 @@ module Blergy
         cmd = %Q{
           aws connect create-routing-profile \\
           --instance-id #{staging_instance.connect_instance_id} \\
-          --cli-input-json #{for_staging(staging_instance).to_json}
+          --cli-input-json "#{for_staging(staging_instance).to_json.gsub('"','\"')}"
         }
+
         puts cmd
-        # result = JSON.parse(`#{cmd}`)
-        # instance.with_rate_limit do
-        #   instance.users[hash.arn]=self.new(instance, {'id' => result["UserId"]})
-        # end
-        raise "hell"
+        result = JSON.parse(`#{cmd}`)
+        puts "result #{result}"
+        instance.with_rate_limit do
+          instance.users[result["RoutingProfileArn"]]=self.class.new(staging_instance, {'id' => result["RoutingProfileId"]})
+        end
       end
 
       def self.read(instance)

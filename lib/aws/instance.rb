@@ -207,9 +207,9 @@ module Blergy
 
       def migrate_part_2(staging_instance_id)
         staging_instance = self.class.new(staging_instance_id, target_directory, region, :staging)
-        # routing_profiles.values.reject {|routing_profile| staging_instance.routing_profile_by_name_for(routing_profile.name)}.each do |routing_profile|
-        #   routing_profile.create(staging_instance)
-        # end
+        routing_profiles.values.reject {|routing_profile| staging_instance.routing_profile_by_name_for(routing_profile.name)}.each do |routing_profile|
+          routing_profile.create(staging_instance)
+        end
         users.values.reject {|user| staging_instance.user_by_name_for(user.name)}.each do |user|
           user.create(staging_instance)
         end
@@ -225,12 +225,12 @@ module Blergy
 
       def read
         self.attributes = client.describe_instance({instance_id: connect_instance_id}).instance
-        # LambdaFunctionAssociation.read(self)
-        # ContactFlow.read(self)
-        # LambdaFunction.read(self)
-        # Queue.read(self)
+        LambdaFunctionAssociation.read(self)
+        ContactFlow.read(self)
+        LambdaFunction.read(self)
+        Queue.read(self)
         QueueQuickConnect.read(self)
-        # HoursOfOperation.read(self)
+        HoursOfOperation.read(self)
         User.read(self)
         RoutingProfile.read(self)
         SecurityProfile.read(self)
