@@ -4,7 +4,7 @@ module Blergy
 
       def initialize(instance, hash)
         self.instance=instance
-        self.attributes={}.merge instance.client.describe_routing_profile(instance_id: instance.connect_instance_id, routing_profile_id: hash['id']).routing_profile
+        self.attributes={id: hash['id']}.merge instance.client.describe_routing_profile(instance_id: instance.connect_instance_id, routing_profile_id: hash['id']).routing_profile
       end
 
       def self.modules_dir(instance)

@@ -4,7 +4,7 @@ module Blergy
 
       def initialize(instance, hash)
         self.instance=instance
-        self.attributes={}.merge instance.client.describe_user(instance_id: instance.connect_instance_id, user_id: hash['id']).user
+        self.attributes={id: hash['id']}.merge instance.client.describe_user(instance_id: instance.connect_instance_id, user_id: hash['id']).user
       end
 
       def self.modules_dir(instance)
@@ -30,9 +30,7 @@ module Blergy
         name = instance.security_profile_by_id_for(attributes[:security_profile_ids][0]).name
         security_profile_id = staging_instance.security_profile_by_name_for(name).id
         name = instance.routing_profile_by_id_for(attributes[:routing_profile_id]).name
-        puts attributes
-
-        routing_profile_id = "2e32a83a-68a2-4eae-a7de-2e63c33e58f4" #staging_instance.routing_profile_by_name_for(name).id
+        routing_profile_id = staging_instance.routing_profile_by_name_for(name)&.id
         {
           "Username": attributes[:username],
           "Password": "Good2Eat!",
@@ -62,7 +60,7 @@ module Blergy
         result = JSON.parse(`#{cmd}`)
         puts result
         instance.with_rate_limit do
-           instance.users[result["UserArn"]]=self.class.new(instance, {'id' => result["UserId"]})
+           instance.users[result["UserArn"]]=self.class.new(staging_instance, {'id' => result["UserId"]})
         end
       end
 
